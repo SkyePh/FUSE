@@ -16,13 +16,13 @@ def scrape_eu_portal_with_search():
         search_input_selector = "input[role='combobox']"
         page.wait_for_selector(search_input_selector)
 
-        # Click the input field to focus
+        #click search field
         page.click(search_input_selector)
 
-        # Enter a search term (e.g., "HORIZON")
+        #search
         page.fill(search_input_selector, "HORIZON-CL4")
 
-        # Simulate pressing Enter if required
+        #press enter to search
         page.press(search_input_selector, "Enter")
 
         # Wait for results to load
@@ -31,7 +31,7 @@ def scrape_eu_portal_with_search():
         # Extract the results
         html = page.content()
         soup = BeautifulSoup(html, "html.parser")
-        call_items = soup.select(".sedia-result-card")  # Replace with the actual result card selector
+        call_items = soup.select(".sedia-result-card-calls-for-proposals")  # Replace with the actual result card selector
         for item in call_items:
             title = item.select_one(".eui-u-text-link").text.strip() if item.select_one(".eui-u-text-link") else "No title"
             identifier = item.select_one("span.ng-star-inserted").text.strip() if item.select_one("span.ng-star-inserted") else "No identifier"

@@ -1,1 +1,4 @@
 playwright
+requests
+pandas
+bs4
