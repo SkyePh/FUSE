@@ -1,53 +1,48 @@
-import requests
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import pandas as pd
-import urllib.parse
 
-BASE_URL = "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals"
+def scrape_eu_portal_with_search():
+    data = []
+    with sync_playwright() as p:
+        # Launch the browser
+        browser = p.chromium.launch(headless=False)  # Use headless=True to run without UI
+        page = browser.new_page()
 
-#identifier parts
-PROGRAM = "HORIZON"
-CLUSTER = "CL4"
-YEAR = "2024"
-CALL_TYPE = "TWIN-TRANSITION"
-CALL_NUMBER = "01"
+        # Navigate to the portal
+        page.goto("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals")
 
-#build the call identifier
-call_identifier = f"{PROGRAM}-{CLUSTER}-{YEAR}-{CALL_TYPE}-{CALL_NUMBER}"
+        # Wait for the input field to appear
+        search_input_selector = "input[role='combobox']"
+        page.wait_for_selector(search_input_selector)
 
-#params
-CALL_PARAMS = {
-    "order": "DESC",
-    "pageNumber": 1,
-    "pageSize": 50,
-    "sortBy": "startDate",
-    "isExactMatch": "true",
-    "status": "31094501,31094502,31094503",
-    "callIdentifier": call_identifier
-}
+        # Click the input field to focus
+        page.click(search_input_selector)
 
-def construct_call_url(base_url, params):
-    # Construct the URL by encoding the parameters
-    query_string = urllib.parse.urlencode(params, doseq=True)
-    return f"{base_url}?{query_string}"
+        # Enter a search term (e.g., "HORIZON")
+        page.fill(search_input_selector, "HORIZON-CL4")
 
-def getCalls(url, params, pageNumber=None):
-    
-    params["pageNumber"] = pageNumber
-    
-    # Send a GET request
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        return response.text
-    else:
-        print(f"Failed to fetch page {pageNumber}. Status code: {response.status_code}")
-        return None
+        # Simulate pressing Enter if required
+        page.press(search_input_selector, "Enter")
 
-#final url
-call_url = construct_call_url(BASE_URL, CALL_PARAMS)
+        # Wait for results to load
+        page.wait_for_selector(".sedia-result-card-calls-for-proposals")  # Replace with the actual result card selector
 
-print(call_url)
-# Example: Fetch the first page
-html_content = getCalls(call_url, CALL_PARAMS)
-#print(html_content)  # For testing
+        # Extract the results
+        html = page.content()
+        soup = BeautifulSoup(html, "html.parser")
+        call_items = soup.select(".sedia-result-card")  # Replace with the actual result card selector
+        for item in call_items:
+            title = item.select_one(".eui-u-text-link").text.strip() if item.select_one(".eui-u-text-link") else "No title"
+            identifier = item.select_one("span.ng-star-inserted").text.strip() if item.select_one("span.ng-star-inserted") else "No identifier"
+            data.append({"Title": title, "Identifier": identifier})
+
+        # Close the browser
+        browser.close()
+
+    # Save the data to a CSV
+    df = pd.DataFrame(data)
+    df.to_csv("search_results.csv", index=False)
+    print("Data saved to search_results.csv")
+
+scrape_eu_portal_with_search()
