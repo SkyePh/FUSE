@@ -6,7 +6,7 @@ def scrape_eu_portal():
     data = []
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=True)  # Use headless=True to run without UI
+        browser = p.chromium.launch(headless=False)  # Use headless=True to run without UI
         page = browser.new_page()
 
         # Navigate to the portal
@@ -71,6 +71,7 @@ def scrape_eu_portal():
         next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
         next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
 
+
         while True:
 
             # Wait for results to load
@@ -87,31 +88,76 @@ def scrape_eu_portal():
                 # Extract title
                 title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
                 title = title_element.text.strip() if title_element else "No title"
-                print("got it title")
 
                 # Extract identifier
                 identifier_element = item.select_one("sedia-result-card-type span.ng-star-inserted")
                 identifier = identifier_element.text.strip() if identifier_element else "No identifier"
-                print("got it id")
 
                 # Extract deadline
                 deadline_element = item.select_one("sedia-result-card-type strong.ng-star-inserted")
                 deadline = deadline_element.text.strip() if deadline_element else "No deadline found"
-                print("got it deadline")
 
                 # Extract status
                 status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
                 status = status_element.text.strip() if status_element else "No status found"
-                print("got it status")
+
+                print("Fetched Item")
+
+                #here we open the card and read budget and then go back mayube??
+
+                # Extract link to call details
+                link_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
+                call_link = link_element['href'] if link_element else "No link"
+
+                # Initialize budget details
+                budget = "No budget found"
+                funding_per_submission = "No funding info"
+                accepted_submissions = "No submission info"
+
+                # Navigate to the call details page
+                if call_link != "No link":
+                    page.goto(f"https://ec.europa.eu{call_link}")
+                    print(f"Opened link: {call_link}")
+
+                    # Locate the Budget Overview card
+                    budget_section = page.locator('eui-card:has-text("Budget overview")')
+
+                    # Wait for the table inside the Budget Overview card
+                    page.wait_for_selector('table.eui-table', timeout=30000)
+                    table = budget_section.locator('table.eui-table')
+
+                    # Extract budget
+                    budget_element = table.locator('td').nth(1)
+                    budget = budget_element.text_content().strip() if budget_element else "No budget found"
+
+                    # Extract funding per submission
+                    funding_element = table.locator('div.eui-u-text-wrap').nth(1)
+                    funding_per_submission = funding_element.text_content().strip() if funding_element else "No funding info"
+
+                    # Extract number of accepted submissions
+                    accepted_element = table.locator('div.eui-u-text-wrap').nth(2)
+                    accepted_submissions = accepted_element.text_content().strip() if accepted_element else "No submission info"
+
+                    print(
+                        f"Budget: {budget}, Funding per submission: {funding_per_submission}, Accepted submissions: {accepted_submissions}")
+
+                    # Navigate back to the main page
+                    page.go_back()
+
+                    #this prevents pagination if commented out but if not commented out, it just does the same page again and again idk how to fix
+                    # # Wait for results to load
+                    # page.wait_for_selector("sedia-result-card")
 
                 # Append data
                 data.append({
                     "Title": title,
                     "Identifier": identifier,
                     "Deadline": deadline,
-                    "Status": status
+                    "Status": status,
+                    "Budget": budget,
+                    "Funding Per Submission": funding_per_submission,
+                    "Accepted Submissions": accepted_submissions
                 })
-                print("appended")
 
             # Locate the "Next" button
             next_button = page.locator(next_button_selector)
