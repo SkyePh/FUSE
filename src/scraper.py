@@ -6,24 +6,11 @@ def scrape_eu_portal():
     data = []
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=False)  # Use headless=True to run without UI
+        browser = p.chromium.launch(headless=True)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
         page.goto("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals")
-
-        # # Wait for the input field to appear
-        # search_input_selector = "input[role='combobox']"
-        # page.wait_for_selector(search_input_selector)
-        #
-        # # Click the input field to focus
-        # page.click(search_input_selector)
-        #
-        # # Enter a search term (e.g., "HORIZON")
-        # page.fill(search_input_selector, "HORIZON")
-        #
-        # # Simulate pressing Enter if required
-        # page.press(search_input_selector, "Enter")
 
 # ============================ Apply Filters =====================================
 
