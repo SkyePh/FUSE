@@ -2,11 +2,11 @@ from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import pandas as pd
 
-def scrape_eu_portal_with_tags():
+def scrape_eu_portal():
     data = []
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=False)  # Use headless=True to run without UI
+        browser = p.chromium.launch(headless=True)  # Use headless=True to run without UI
         page = browser.new_page()
 
         # Navigate to the portal
@@ -66,41 +66,89 @@ def scrape_eu_portal_with_tags():
         # Click the button
         page.click(button_selector)
 
-#=======================================================================================================
+# ============================ Pagination and Data Extraction =====================================
 
-        # Wait for results to load
-        page.wait_for_selector("sedia-result-card")  # Use the tag name directly
+        next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
+        next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
 
-        # Extract the HTML content
-        html = page.content()
-        soup = BeautifulSoup(html, "html.parser")
+        while True:
 
-        # Select results by tag
-        call_items = soup.select("sedia-result-card")  # Custom tag, no dot prefix needed
-        for item in call_items:
-            # Extract title
-            title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
-            title = title_element.text.strip() if title_element else "No title"
+            # Wait for results to load
+            page.wait_for_selector("sedia-result-card")
 
-            # Extract identifier
-            identifier_element = item.select_one("sedia-result-card-type span.ng-star-inserted")  # Custom tag + class
-            identifier = identifier_element.text.strip() if identifier_element else "No identifier"
+            # Extract the HTML content
+            html = page.content()
+            soup = BeautifulSoup(html, "html.parser")
 
-            # Extract deadline
-            deadline_element = item.select_one("sedia-result-card-type strong.ng-star-inserted")  # Custom tag + class
-            deadline = deadline_element.text.strip() if deadline_element else "No deadline found"
+            # Extract results on the current page
+            call_items = soup.select("sedia-result-card")
+            counter=1
+            for item in call_items:
+                # Extract title
+                title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
+                title = title_element.text.strip() if title_element else "No title"
+                print("got it title")
 
-            # Extract status
-            status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")  # Nested tags
-            status = status_element.text.strip() if status_element else "No status found"
+                # Extract identifier
+                identifier_element = item.select_one("sedia-result-card-type span.ng-star-inserted")
+                identifier = identifier_element.text.strip() if identifier_element else "No identifier"
+                print("got it id")
 
-            # Append data
-            data.append({
-                "Title": title,
-                "Identifier": identifier,
-                "Deadline": deadline,
-                "Status": status
-            })
+                # Extract deadline
+                deadline_element = item.select_one("sedia-result-card-type strong.ng-star-inserted")
+                deadline = deadline_element.text.strip() if deadline_element else "No deadline found"
+                print("got it deadline")
+
+                # Extract status
+                status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
+                status = status_element.text.strip() if status_element else "No status found"
+                print("got it status")
+
+                # Append data
+                data.append({
+                    "Title": title,
+                    "Identifier": identifier,
+                    "Deadline": deadline,
+                    "Status": status
+                })
+                print("appended")
+                counter+=1
+                print(counter)
+
+            # Locate the "Next" button
+            next_button = page.locator(next_button_selector)
+
+            # Debugging output
+            print("Checking Next button state...")
+            if next_button.count() > 0:
+                # Check if the button is disabled
+                is_disabled = next_button.evaluate("(button) => button.disabled")
+                print(f"Is Next button disabled: {is_disabled}")
+
+                if is_disabled:
+                    print("Next button is disabled. Exiting pagination.")
+                    break
+            else:
+                print("Next button not found. Exiting pagination.")
+                break
+
+            # Wait for the eui-icon-svg element to appear
+            page.wait_for_selector(next_icon_selector, timeout=20000)
+
+            # Locate the icon
+            next_icon = page.locator(next_icon_selector)
+
+            # Debugging output
+            print("Next icon count:", next_icon.count())
+            print("Next icon visible:", next_icon.is_visible())
+
+            # Click the icon if available
+            if next_icon.count() > 0 and next_icon.is_visible():
+                next_icon.click()
+                print("Clicked the 'Next' icon.")
+            else:
+                print("Next icon not found or not visible. Exiting pagination.")
+                break
 
         # Close the browser
         browser.close()
@@ -110,4 +158,4 @@ def scrape_eu_portal_with_tags():
     df.to_csv("search_results.csv", index=False)
     print("Data saved to search_results.csv")
 
-scrape_eu_portal_with_tags()
+scrape_eu_portal()
