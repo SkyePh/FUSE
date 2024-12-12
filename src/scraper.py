@@ -82,7 +82,7 @@ def scrape_eu_portal():
 
             # Extract results on the current page
             call_items = soup.select("sedia-result-card")
-            counter=1
+
             for item in call_items:
                 # Extract title
                 title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
@@ -112,8 +112,6 @@ def scrape_eu_portal():
                     "Status": status
                 })
                 print("appended")
-                counter+=1
-                print(counter)
 
             # Locate the "Next" button
             next_button = page.locator(next_button_selector)
