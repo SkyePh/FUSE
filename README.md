@@ -17,7 +17,7 @@
   playwright install
   ```
 
-##Usage
+## Usage
 
    ```bash
    python src/scraper.py
