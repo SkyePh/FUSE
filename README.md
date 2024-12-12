@@ -3,7 +3,7 @@
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/eu-call-scraper.git
+   git clone https://github.com/SkyePh/eu-call-scraper.git
    cd eu-call-scraper
    ```
 2. Install the required dependencies:
@@ -16,3 +16,8 @@
   ```bash
   playwright install
   ```
+
+##Usage
+
+   ```bash
+   python src/scraper.py
