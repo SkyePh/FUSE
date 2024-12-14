@@ -4,9 +4,6 @@ import pandas as pd
 import re
 
 
-#TODO fix deadlines (takes wrong selector)
-
-
 def scrape_eu_portal():
     data = []
     with sync_playwright() as p:
@@ -76,6 +73,7 @@ def scrape_eu_portal():
             call_items = soup.select("sedia-result-card")
 
             for item in call_items:
+
                 # Extract title
                 title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
                 title = title_element.text.strip() if title_element else "No title"
@@ -83,10 +81,6 @@ def scrape_eu_portal():
                 # Extract identifier
                 identifier_element = item.select_one("sedia-result-card-type span.ng-star-inserted")
                 identifier = identifier_element.text.strip() if identifier_element else "No identifier"
-
-                # Extract deadline
-                deadline_element = item.select_one("sedia-result-card-type strong.ng-star-inserted")
-                deadline = deadline_element.text.strip() if deadline_element else "No deadline found"
 
                 # Extract status
                 status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
@@ -112,25 +106,27 @@ def scrape_eu_portal():
                     call_tab.goto(f"https://ec.europa.eu{call_link}")
                     print(f"Opened link: {call_link}")
 
-                    # # Locate the container holding the deadline
-                    # try:
-                    #     deadline_container = call_tab.locator('div.col-sm-4.ng-star-inserted')
-                    #
-                    #     # Extract the deadline text
-                    #     if deadline_container:
-                    #         deadline_text = deadline_container.locator('div.ng-star-inserted').text_content().strip()
-                    #
-                    #         # Extract only the date part (e.g., "27 February 2025")
-                    #
-                    #         match = re.search(r'\d{1,2} [A-Za-z]+ \d{4}', deadline_text)
-                    #         deadline = match.group(0) if match else "No deadline found"
-                    #     else:
-                    #         deadline = "No deadline found"
-                    # except Exception as e:
-                    #     print(f"Error fetching deadline: {e}")
-                    #     deadline = "No deadline found"
+                    try:
+                        # Wait for the div containing the deadline
+                        deadline_container = call_tab.locator('div.col-sm-4:has-text("Deadline date")')
 
-                    # Locate the Budget Overview card
+                        # Fetch the second child div directly
+                        deadline_element = deadline_container.locator('div:nth-child(2)')
+                        if deadline_element:
+                            deadline_text = deadline_element.text_content().strip()
+
+                            # Use regex to extract the date
+                            match = re.search(r'\d{1,2} [A-Za-z]+ \d{4}', deadline_text)
+                            deadline = match.group(0) if match else "No deadline found"
+                        else:
+                            deadline = "No deadline found"
+
+                        print(f"Extracted Deadline: {deadline}")
+
+                    except Exception as e:
+                        print(f"Error fetching deadline: {e}")
+                        deadline = "No deadline found"
+
                     try:
                         budget_section = call_tab.locator('eui-card:has-text("Budget overview")')
 
@@ -138,21 +134,39 @@ def scrape_eu_portal():
                         call_tab.wait_for_selector('table.eui-table', timeout=30000)
                         table = budget_section.locator('table.eui-table')
 
-                        # Extract budget
+                        # Extract and clean the budget
                         budget_element = table.locator('td').nth(1)
-                        budget = budget_element.text_content().strip() if budget_element else "No budget found"
+                        if budget_element:
+                            raw_budget = budget_element.text_content().strip()
+                            # Remove spaces and any trailing dot
+                            budget = raw_budget.replace(" ", "").rstrip(".")
+                        else:
+                            budget = "No budget found"
 
-                        # Extract funding per submission
+                        # Extract and process funding per submission
                         funding_element = table.locator('div.eui-u-text-wrap').nth(1)
-                        funding_per_submission = funding_element.text_content().strip() if funding_element else "No funding info"
+                        if funding_element:
+                            raw_funding = funding_element.text_content().strip()
+                            if "to" in raw_funding:
+                                min_funding, max_funding = map(lambda x: x.replace(" ", ""), raw_funding.split("to"))
+                                funding_per_submission = f"Min: {min_funding} Max: {max_funding}"
+                            elif "around" in raw_funding:
+                                funding_per_submission = f"~ {raw_funding.replace('around', '').strip()}"
+                            else:
+                                funding_per_submission = raw_funding  # In case of an unexpected format
+                        else:
+                            funding_per_submission = "No funding info"
 
                         # Extract number of accepted submissions
                         accepted_element = table.locator('div.eui-u-text-wrap').nth(2)
-                        accepted_submissions = accepted_element.text_content().strip() if accepted_element else "No submission info"
+                        accepted_submissions = (
+                            accepted_element.text_content().strip() if accepted_element else "No submission info"
+                        )
 
                         print(
                             f"Budget: {budget}, Funding per submission: {funding_per_submission}, Accepted submissions: {accepted_submissions}"
                         )
+
                     except Exception as e:
                         print(f"Error fetching budget information: {e}")
                         budget = "No budget found"
