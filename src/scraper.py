@@ -1,12 +1,17 @@
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import pandas as pd
+import re
+
+
+#TODO fix deadlines (takes wrong selector)
+
 
 def scrape_eu_portal():
     data = []
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=True)  #change to False to run with UI
+        browser = p.chromium.launch(headless=False)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
@@ -41,11 +46,11 @@ def scrape_eu_portal():
         # Click the checkbox
         page.click(checkbox_selector)
 
-        # Wait for the checkbox
-        checkbox_selector = "input.eui-input-checkbox[name='31094503']"
-        page.wait_for_selector(checkbox_selector)
-        # Click the checkbox
-        page.click(checkbox_selector)
+        # # Wait for the checkbox
+        # checkbox_selector = "input.eui-input-checkbox[name='31094503']"
+        # page.wait_for_selector(checkbox_selector)
+        # # Click the checkbox
+        # page.click(checkbox_selector)
 
         # Wait for the button to appear
         button_selector = "button[aria-label='Primary']:has-text('View results')"
@@ -57,7 +62,6 @@ def scrape_eu_portal():
 
         next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
         next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
-
 
         while True:
 
@@ -103,37 +107,60 @@ def scrape_eu_portal():
 
                 # Navigate to the call details page
                 if call_link != "No link":
-                    page.goto(f"https://ec.europa.eu{call_link}")
+                    # Open the call link in a new tab
+                    call_tab = browser.new_page()
+                    call_tab.goto(f"https://ec.europa.eu{call_link}")
                     print(f"Opened link: {call_link}")
 
+                    # # Locate the container holding the deadline
+                    # try:
+                    #     deadline_container = call_tab.locator('div.col-sm-4.ng-star-inserted')
+                    #
+                    #     # Extract the deadline text
+                    #     if deadline_container:
+                    #         deadline_text = deadline_container.locator('div.ng-star-inserted').text_content().strip()
+                    #
+                    #         # Extract only the date part (e.g., "27 February 2025")
+                    #
+                    #         match = re.search(r'\d{1,2} [A-Za-z]+ \d{4}', deadline_text)
+                    #         deadline = match.group(0) if match else "No deadline found"
+                    #     else:
+                    #         deadline = "No deadline found"
+                    # except Exception as e:
+                    #     print(f"Error fetching deadline: {e}")
+                    #     deadline = "No deadline found"
+
                     # Locate the Budget Overview card
-                    budget_section = page.locator('eui-card:has-text("Budget overview")')
+                    try:
+                        budget_section = call_tab.locator('eui-card:has-text("Budget overview")')
 
-                    # Wait for the table inside the Budget Overview card
-                    page.wait_for_selector('table.eui-table', timeout=30000)
-                    table = budget_section.locator('table.eui-table')
+                        # Wait for the table inside the Budget Overview card
+                        call_tab.wait_for_selector('table.eui-table', timeout=30000)
+                        table = budget_section.locator('table.eui-table')
 
-                    # Extract budget
-                    budget_element = table.locator('td').nth(1)
-                    budget = budget_element.text_content().strip() if budget_element else "No budget found"
+                        # Extract budget
+                        budget_element = table.locator('td').nth(1)
+                        budget = budget_element.text_content().strip() if budget_element else "No budget found"
 
-                    # Extract funding per submission
-                    funding_element = table.locator('div.eui-u-text-wrap').nth(1)
-                    funding_per_submission = funding_element.text_content().strip() if funding_element else "No funding info"
+                        # Extract funding per submission
+                        funding_element = table.locator('div.eui-u-text-wrap').nth(1)
+                        funding_per_submission = funding_element.text_content().strip() if funding_element else "No funding info"
 
-                    # Extract number of accepted submissions
-                    accepted_element = table.locator('div.eui-u-text-wrap').nth(2)
-                    accepted_submissions = accepted_element.text_content().strip() if accepted_element else "No submission info"
+                        # Extract number of accepted submissions
+                        accepted_element = table.locator('div.eui-u-text-wrap').nth(2)
+                        accepted_submissions = accepted_element.text_content().strip() if accepted_element else "No submission info"
 
-                    print(
-                        f"Budget: {budget}, Funding per submission: {funding_per_submission}, Accepted submissions: {accepted_submissions}")
+                        print(
+                            f"Budget: {budget}, Funding per submission: {funding_per_submission}, Accepted submissions: {accepted_submissions}"
+                        )
+                    except Exception as e:
+                        print(f"Error fetching budget information: {e}")
+                        budget = "No budget found"
+                        funding_per_submission = "No funding info"
+                        accepted_submissions = "No submission info"
 
-                    # Navigate back to the main page
-                    page.go_back()
-
-                    #this prevents pagination if commented out but if not commented out, it just does the same page again and again idk how to fix
-                    # # Wait for results to load
-                    # page.wait_for_selector("sedia-result-card")
+                    # Close the call tab and return to the main tab
+                    call_tab.close()
 
                 # Append data
                 data.append({
@@ -146,9 +173,9 @@ def scrape_eu_portal():
                     "Accepted Submissions": accepted_submissions
                 })
 
+            page.wait_for_selector(next_button_selector)
             # Locate the "Next" button
             next_button = page.locator(next_button_selector)
-
             # Debugging output
             print("Checking Next button state...")
             if next_button.count() > 0:
@@ -177,9 +204,12 @@ def scrape_eu_portal():
             if next_icon.count() > 0 and next_icon.is_visible():
                 next_icon.click()
                 print("Clicked the 'Next' icon.")
+                print("waiting for 30 sec to load next page")
+                page.wait_for_timeout(30000)
             else:
                 print("Next icon not found or not visible. Exiting pagination.")
                 break
+
 
         # Close the browser
         browser.close()
