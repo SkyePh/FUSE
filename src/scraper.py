@@ -3,65 +3,134 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
+#TODO optimize forthcoming that dont have table
 
 def scrape_eu_portal():
-    data = []
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=False)  #change to False to run with UI
+        browser = p.chromium.launch(headless=True)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
         page.goto("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals")
 
-# ============================ Apply Filters =====================================
+    # ======================================= Apply Filters ===========================================
 
-        # Wait for the filter button to appear
-        button_selector = "button[data-e2e='eui-button']:has-text('All filters')"  # Using the unique data-e2e attribute
+        # Press the Programme button
+        button_selector = "button[data-e2e='eui-button']:has-text('Programme')"
         page.wait_for_selector(button_selector)
-
-        # Click the button
         page.click(button_selector)
 
-        # Wait for the HORIZON button to appear
-        button_selector = "button[role='menuitem']:has-text('Horizon Europe (HORIZON)')"
-        page.wait_for_selector(button_selector)
+        # Press the HORIZON button
+        horizon_button_selector = "button.eui-dropdown-item:has-text('Horizon Europe (HORIZON)')"
+        page.wait_for_selector(horizon_button_selector, timeout=30000)
+        page.click(horizon_button_selector)
 
-        # Click the button
-        page.click(button_selector)
+        # Press the Call button
+        submission_status_button_selector = "button.eui-button:has-text('Call')"
+        page.wait_for_selector(submission_status_button_selector, timeout=30000)
+        page.click(submission_status_button_selector)
 
-        # Wait for the toggle button to appear
-        toggle_button_selector = "button[data-e2e='eui-button'][aria-label='Toggle Global Challenges and European Industrial Competitiveness']"
-        page.wait_for_selector(toggle_button_selector)
+        #============ fetch all the available calls and ask to choose one ====================
 
-        # Click the toggle button
-        page.click(toggle_button_selector)
+        # Selector for the dropdown container
+        dropdown_container_selector = 'div.eui-u-overflow-auto'
 
-        # Wait for the checkbox within the specific <li> element
-        checkbox_selector = "li[title='Digital, Industry and Space'] input.eui-input-checkbox"
-        page.wait_for_selector(checkbox_selector)
-        # Click the checkbox
-        page.click(checkbox_selector)
+        # Wait for the dropdown container to load
+        page.wait_for_selector(dropdown_container_selector, timeout=30000)
 
-        # # Wait for the checkbox
-        # checkbox_selector = "input.eui-input-checkbox[name='31094503']"
-        # page.wait_for_selector(checkbox_selector)
-        # # Click the checkbox
-        # page.click(checkbox_selector)
+        # Locate the dropdown container
+        dropdown_container = page.locator(dropdown_container_selector)
 
-        # Wait for the button to appear
-        button_selector = "button[aria-label='Primary']:has-text('View results')"
-        page.wait_for_selector(button_selector)
-        # Click the button
-        page.click(button_selector)
+        # Scroll through the dropdown container to ensure all items are visible
+        dropdown_container.evaluate('(node) => node.scrollTop = 0')  # Start at the top
 
-# ============================ Pagination and Data Extraction =====================================
+        # Continuously scroll until all items are loaded
+        previous_item_count = 0
+        while True:
+            # Get the current number of buttons
+            current_item_count = dropdown_container.locator('button.eui-dropdown-item').count()
+
+            if current_item_count > previous_item_count:
+                previous_item_count = current_item_count
+                # Scroll further down
+                dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
+                page.wait_for_timeout(500)  # Wait for the content to load
+            else:
+                # Stop scrolling if no new items are being loaded
+                break
+
+        print(f"Total buttons found after scrolling: {previous_item_count}")
+
+        # Now fetch all the options
+        options = []
+
+        # Locate all dropdown buttons
+        buttons = dropdown_container.locator('button.eui-dropdown-item')
+
+        for i in range(previous_item_count):
+            try:
+                # Locate the specific span with 'eui-u-pr-s' class
+                span = buttons.nth(i).locator('span.eui-u-pr-s')
+
+                if span.count() > 0:
+                    # Extract the text content
+                    span_text = span.evaluate('(node) => node.childNodes[0]?.nodeValue').strip()
+                    options.append(span_text)
+                else:
+                    print(f"No relevant span found for button {i}.")
+            except Exception as e:
+                print(f"Error processing button {i}: {e}")
+
+        # Print all extracted options
+        print("Extracted Options:", options)
+
+        #==================================== get input =========================================
+
+        menu_option_call = 1
+        for i in range(len(options)):
+            print(menu_option_call, ") ", options[i])
+            menu_option_call += 1
+
+        desired_category = input("\nPlease choose which category you would like to scrape: ")
+
+        try:
+            # Convert user input to index
+            desired_index = int(desired_category) - 1
+
+            if 0 <= desired_index < len(options):
+                # Get the text of the selected option
+                selected_option = options[desired_index]
+
+                # Locate the button with the matching span text
+                matching_button = page.locator(f'button.eui-dropdown-item:has(span:text-is("{selected_option}"))')
+
+                if matching_button.count() > 0:
+                    print(f"Found button for category: {selected_option}")
+                    # Click the matching button
+                    matching_button.first.click()
+                    print("clicked")
+                else:
+                    print(f"No button found for the selected category: {selected_option}")
+            else:
+                print("Invalid selection. Please choose a valid option from the menu.")
+        except ValueError:
+            print("Invalid input. Please enter a number corresponding to the menu options.")
+
+
+    # ============================ Pagination and Data Extraction =====================================
+
+        #safety delay
+        page.wait_for_timeout(5000)
 
         next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
         next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
 
-        while True:
+        # Initialize data containers
+        titles_data = []
+        table_data = []
 
+        while True:
             # Wait for results to load
             page.wait_for_selector("sedia-result-card")
 
@@ -73,8 +142,7 @@ def scrape_eu_portal():
             call_items = soup.select("sedia-result-card")
 
             for item in call_items:
-
-                # Extract title
+                # Extract title (name)
                 title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
                 title = title_element.text.strip() if title_element else "No title"
 
@@ -86,106 +154,62 @@ def scrape_eu_portal():
                 status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
                 status = status_element.text.strip() if status_element else "No status found"
 
-                print("Fetched Item")
+                # Append to titles_data
+                titles_data.append({"Identifier": identifier, "Title": title, "Status": status})
 
-                #here we open the card and read budget and then go back mayube??
+            # Open the first card to extract table data
+            if len(table_data) == 0:  # Only fetch table data from the first card
+                first_call_link_element = call_items[0].select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
+                first_call_link = first_call_link_element['href'] if first_call_link_element else None
 
-                # Extract link to call details
-                link_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
-                call_link = link_element['href'] if link_element else "No link"
+                if first_call_link:
+                    # Navigate to the first call details page
+                    page.goto(f"https://ec.europa.eu{first_call_link}")
+                    print(f"Opened first call link: {first_call_link}")
 
-                # Initialize budget details
-                budget = "No budget found"
-                funding_per_submission = "No funding info"
-                accepted_submissions = "No submission info"
+                    # Wait for the table inside the card
+                    page.wait_for_selector('table.eui-table', timeout=30000)
 
-                # Navigate to the call details page
-                if call_link != "No link":
-                    # Open the call link in a new tab
-                    call_tab = browser.new_page()
-                    call_tab.goto(f"https://ec.europa.eu{call_link}")
-                    print(f"Opened link: {call_link}")
+                    # Extract table data
+                    html = page.content()
+                    soup = BeautifulSoup(html, "html.parser")
+                    rows = soup.select('table.eui-table tbody tr')
 
-                    try:
-                        # Wait for the div containing the deadline
-                        deadline_container = call_tab.locator('div.col-sm-4:has-text("Deadline date")')
+                    for row in rows:
+                        # Extract identifier and truncate at the first whitespace
+                        identifier_element = row.select_one('td:nth-child(1)')
+                        raw_identifier = identifier_element.text.strip()
+                        identifier = raw_identifier.split(" ")[0] if raw_identifier else "No identifier"
 
-                        # Fetch the second child div directly
-                        deadline_element = deadline_container.locator('div:nth-child(2)')
-                        if deadline_element:
-                            deadline_text = deadline_element.text_content().strip()
+                        # Extract budget
+                        raw_budget = row.select_one('td:nth-child(2)').text.strip()
+                        budget = raw_budget.replace(" ", "").rstrip(".")
 
-                            # Use regex to extract the date
-                            match = re.search(r'\d{1,2} [A-Za-z]+ \d{4}', deadline_text)
-                            deadline = match.group(0) if match else "No deadline found"
+                        # Extract deadline
+                        deadline = row.select_one('td:nth-child(5)').text.strip()
+
+                        # Extract funding per submission
+                        funding_element = row.select_one('td:nth-child(6)')
+                        raw_funding = funding_element.text.strip() if funding_element else "No funding info"
+                        if "to" in raw_funding:
+                            min_funding, max_funding = map(lambda x: x.replace(" ", ""), raw_funding.split("to"))
+                            funding_per_submission = f"Min: {min_funding} Max: {max_funding}"
+                        elif "around" in raw_funding:
+                            funding_per_submission = f"~ {raw_funding.replace('around', '').strip()}"
                         else:
-                            deadline = "No deadline found"
+                            funding_per_submission = raw_funding
 
-                        print(f"Extracted Deadline: {deadline}")
+                        # Extract accepted submissions
+                        accepted_submissions = row.select_one('td:nth-child(7)').text.strip()
 
-                    except Exception as e:
-                        print(f"Error fetching deadline: {e}")
-                        deadline = "No deadline found"
-
-                    try:
-                        budget_section = call_tab.locator('eui-card:has-text("Budget overview")')
-
-                        # Wait for the table inside the Budget Overview card
-                        call_tab.wait_for_selector('table.eui-table', timeout=30000)
-                        table = budget_section.locator('table.eui-table')
-
-                        # Extract and clean the budget
-                        budget_element = table.locator('td').nth(1)
-                        if budget_element:
-                            raw_budget = budget_element.text_content().strip()
-                            # Remove spaces and any trailing dot
-                            budget = raw_budget.replace(" ", "").rstrip(".")
-                        else:
-                            budget = "No budget found"
-
-                        # Extract and process funding per submission
-                        funding_element = table.locator('div.eui-u-text-wrap').nth(1)
-                        if funding_element:
-                            raw_funding = funding_element.text_content().strip()
-                            if "to" in raw_funding:
-                                min_funding, max_funding = map(lambda x: x.replace(" ", ""), raw_funding.split("to"))
-                                funding_per_submission = f"Min: {min_funding} Max: {max_funding}"
-                            elif "around" in raw_funding:
-                                funding_per_submission = f"~ {raw_funding.replace('around', '').strip()}"
-                            else:
-                                funding_per_submission = raw_funding  # In case of an unexpected format
-                        else:
-                            funding_per_submission = "No funding info"
-
-                        # Extract number of accepted submissions
-                        accepted_element = table.locator('div.eui-u-text-wrap').nth(2)
-                        accepted_submissions = (
-                            accepted_element.text_content().strip() if accepted_element else "No submission info"
-                        )
-
-                        print(
-                            f"Budget: {budget}, Funding per submission: {funding_per_submission}, Accepted submissions: {accepted_submissions}"
-                        )
-
-                    except Exception as e:
-                        print(f"Error fetching budget information: {e}")
-                        budget = "No budget found"
-                        funding_per_submission = "No funding info"
-                        accepted_submissions = "No submission info"
-
-                    # Close the call tab and return to the main tab
-                    call_tab.close()
-
-                # Append data
-                data.append({
-                    "Title": title,
-                    "Identifier": identifier,
-                    "Deadline": deadline,
-                    "Status": status,
-                    "Budget": budget,
-                    "Funding Per Submission": funding_per_submission,
-                    "Accepted Submissions": accepted_submissions
-                })
+                        # Append to table_data
+                        table_data.append({
+                            "Identifier": identifier,
+                            "Budget": budget,
+                            "Deadline": deadline,
+                            "Funding Per Submission": funding_per_submission,
+                            "Accepted Submissions": accepted_submissions
+                        })
 
             page.wait_for_selector(next_button_selector)
             # Locate the "Next" button
@@ -228,9 +252,14 @@ def scrape_eu_portal():
         # Close the browser
         browser.close()
 
-    # Save the data to a CSV
-    df = pd.DataFrame(data)
-    df.to_csv("search_results.csv", index=False)
-    print("Data saved to search_results.csv")
+    # Merge titles_data with table_data
+    table_df = pd.DataFrame(table_data)
+    titles_df = pd.DataFrame(titles_data)
+    final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
+    columns_order = ["Title"] + [col for col in final_df.columns if col != "Title"]
+    final_df = final_df[columns_order]
+    # Save to CSV
+    final_df.to_csv("call_data.csv", index=False)
+    print("Data saved to call_data.csv")
 
 scrape_eu_portal()
