@@ -4,7 +4,6 @@ import pandas as pd
 import re
 
 #TODO fix budgets
-#TODO fetch call specifiers and keep then in array
 
 def scrape_eu_portal():
     data = []
