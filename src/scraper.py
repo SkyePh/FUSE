@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
+#TODO fix budgets
+#TODO fetch call specifiers and keep then in array
 
 def scrape_eu_portal():
     data = []
@@ -14,49 +16,113 @@ def scrape_eu_portal():
         # Navigate to the portal
         page.goto("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals")
 
-# ============================ Apply Filters =====================================
+    # ======================================= Apply Filters ===========================================
 
-        # Wait for the filter button to appear
-        button_selector = "button[data-e2e='eui-button']:has-text('All filters')"  # Using the unique data-e2e attribute
+        # Press the Programme button
+        button_selector = "button[data-e2e='eui-button']:has-text('Programme')"
         page.wait_for_selector(button_selector)
-
-        # Click the button
         page.click(button_selector)
 
-        # Wait for the HORIZON button to appear
-        button_selector = "button[role='menuitem']:has-text('Horizon Europe (HORIZON)')"
-        page.wait_for_selector(button_selector)
+        # Press the HORIZON button
+        horizon_button_selector = "button.eui-dropdown-item:has-text('Horizon Europe (HORIZON)')"
+        page.wait_for_selector(horizon_button_selector, timeout=30000)
+        page.click(horizon_button_selector)
 
-        # Click the button
-        page.click(button_selector)
+        # Press the Call button
+        submission_status_button_selector = "button.eui-button:has-text('Call')"
+        page.wait_for_selector(submission_status_button_selector, timeout=30000)
+        page.click(submission_status_button_selector)
 
-        # Wait for the toggle button to appear
-        toggle_button_selector = "button[data-e2e='eui-button'][aria-label='Toggle Global Challenges and European Industrial Competitiveness']"
-        page.wait_for_selector(toggle_button_selector)
+        #============ fetch all the available calls and ask to choose one ====================
 
-        # Click the toggle button
-        page.click(toggle_button_selector)
+        # Selector for the dropdown container
+        dropdown_container_selector = 'div.eui-u-overflow-auto'
 
-        # Wait for the checkbox within the specific <li> element
-        checkbox_selector = "li[title='Digital, Industry and Space'] input.eui-input-checkbox"
-        page.wait_for_selector(checkbox_selector)
-        # Click the checkbox
-        page.click(checkbox_selector)
+        # Wait for the dropdown container to load
+        page.wait_for_selector(dropdown_container_selector, timeout=30000)
 
-        # # Wait for the checkbox
-        # checkbox_selector = "input.eui-input-checkbox[name='31094503']"
-        # page.wait_for_selector(checkbox_selector)
-        # # Click the checkbox
-        # page.click(checkbox_selector)
+        # Locate the dropdown container
+        dropdown_container = page.locator(dropdown_container_selector)
 
-        # Wait for the button to appear
-        button_selector = "button[aria-label='Primary']:has-text('View results')"
-        page.wait_for_selector(button_selector)
-        # Click the button
-        page.click(button_selector)
+        # Scroll through the dropdown container to ensure all items are visible
+        dropdown_container.evaluate('(node) => node.scrollTop = 0')  # Start at the top
 
-# ============================ Pagination and Data Extraction =====================================
+        # Continuously scroll until all items are loaded
+        previous_item_count = 0
+        while True:
+            # Get the current number of buttons
+            current_item_count = dropdown_container.locator('button.eui-dropdown-item').count()
 
+            if current_item_count > previous_item_count:
+                previous_item_count = current_item_count
+                # Scroll further down
+                dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
+                page.wait_for_timeout(500)  # Wait for the content to load
+            else:
+                # Stop scrolling if no new items are being loaded
+                break
+
+        print(f"Total buttons found after scrolling: {previous_item_count}")
+
+        # Now fetch all the options
+        options = []
+
+        # Locate all dropdown buttons
+        buttons = dropdown_container.locator('button.eui-dropdown-item')
+
+        for i in range(previous_item_count):
+            try:
+                # Locate the specific span with 'eui-u-pr-s' class
+                span = buttons.nth(i).locator('span.eui-u-pr-s')
+
+                if span.count() > 0:
+                    # Extract the text content
+                    span_text = span.evaluate('(node) => node.childNodes[0]?.nodeValue').strip()
+                    options.append(span_text)
+                else:
+                    print(f"No relevant span found for button {i}.")
+            except Exception as e:
+                print(f"Error processing button {i}: {e}")
+
+        # Print all extracted options
+        print("Extracted Options:", options)
+
+        #==================================== get input =========================================
+
+        menu_option_call = 1
+        for i in range(len(options)):
+            print(menu_option_call, ") ", options[i])
+            menu_option_call += 1
+
+        desired_category = input("\nPlease choose which category you would like to scrape: ")
+
+        try:
+            # Convert user input to index
+            desired_index = int(desired_category) - 1
+
+            if 0 <= desired_index < len(options):
+                # Get the text of the selected option
+                selected_option = options[desired_index]
+
+                # Locate the button with the matching span text
+                matching_button = page.locator(f'button.eui-dropdown-item:has(span:text-is("{selected_option}"))')
+
+                if matching_button.count() > 0:
+                    print(f"Found button for category: {selected_option}")
+                    # Click the matching button
+                    matching_button.first.click()
+                    print("clicked")
+                else:
+                    print(f"No button found for the selected category: {selected_option}")
+            else:
+                print("Invalid selection. Please choose a valid option from the menu.")
+        except ValueError:
+            print("Invalid input. Please enter a number corresponding to the menu options.")
+
+
+    # ============================ Pagination and Data Extraction =====================================
+
+        page.wait_for_timeout(5000)
         next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
         next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
 
