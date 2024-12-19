@@ -3,12 +3,12 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
-#TODO optimize forthcoming that dont have table
+#TODO implement default option for "all"
 
 def scrape_eu_portal():
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=True)  #change to False to run with UI
+        browser = p.chromium.launch(headless=False)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
@@ -157,59 +157,88 @@ def scrape_eu_portal():
                 # Append to titles_data
                 titles_data.append({"Identifier": identifier, "Title": title, "Status": status})
 
-            # Open the first card to extract table data
-            if len(table_data) == 0:  # Only fetch table data from the first card
+            # Open the first card to extract table data or fallback to "Total funding available"
+            if len(table_data) == 0:  # Only fetch data from the first card
                 first_call_link_element = call_items[0].select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
                 first_call_link = first_call_link_element['href'] if first_call_link_element else None
 
                 if first_call_link:
-                    # Navigate to the first call details page
-                    page.goto(f"https://ec.europa.eu{first_call_link}")
-                    print(f"Opened first call link: {first_call_link}")
+                    # Open a new tab for the first call details page
+                    new_tab = browser.new_page()
+                    new_tab.goto(f"https://ec.europa.eu{first_call_link}")
+                    print(f"Opened first call link in a new tab: {first_call_link}")
 
-                    # Wait for the table inside the card
-                    page.wait_for_selector('table.eui-table', timeout=30000)
+                    try:
+                        # Wait for the table inside the card
+                        new_tab.wait_for_selector('table.eui-table', timeout=10000)
 
-                    # Extract table data
-                    html = page.content()
-                    soup = BeautifulSoup(html, "html.parser")
-                    rows = soup.select('table.eui-table tbody tr')
+                        # Extract table data
+                        html = new_tab.content()
+                        soup = BeautifulSoup(html, "html.parser")
+                        rows = soup.select('table.eui-table tbody tr')
 
-                    for row in rows:
-                        # Extract identifier and truncate at the first whitespace
-                        identifier_element = row.select_one('td:nth-child(1)')
-                        raw_identifier = identifier_element.text.strip()
-                        identifier = raw_identifier.split(" ")[0] if raw_identifier else "No identifier"
+                        for row in rows:
+                            # Extract identifier and truncate at the first whitespace
+                            identifier_element = row.select_one('td:nth-child(1)')
+                            raw_identifier = identifier_element.text.strip()
+                            identifier = raw_identifier.split(" ")[0] if raw_identifier else "No identifier"
 
-                        # Extract budget
-                        raw_budget = row.select_one('td:nth-child(2)').text.strip()
-                        budget = raw_budget.replace(" ", "").rstrip(".")
+                            # Extract budget
+                            raw_budget = row.select_one('td:nth-child(2)').text.strip()
+                            budget = raw_budget.replace(" ", "").rstrip(".")
 
-                        # Extract deadline
-                        deadline = row.select_one('td:nth-child(5)').text.strip()
+                            # Extract deadline
+                            deadline = row.select_one('td:nth-child(5)').text.strip()
 
-                        # Extract funding per submission
-                        funding_element = row.select_one('td:nth-child(6)')
-                        raw_funding = funding_element.text.strip() if funding_element else "No funding info"
-                        if "to" in raw_funding:
-                            min_funding, max_funding = map(lambda x: x.replace(" ", ""), raw_funding.split("to"))
-                            funding_per_submission = f"Min: {min_funding} Max: {max_funding}"
-                        elif "around" in raw_funding:
-                            funding_per_submission = f"~ {raw_funding.replace('around', '').strip()}"
-                        else:
-                            funding_per_submission = raw_funding
+                            # Extract funding per submission
+                            funding_element = row.select_one('td:nth-child(6)')
+                            raw_funding = funding_element.text.strip() if funding_element else "No funding info"
+                            if "to" in raw_funding:
+                                min_funding, max_funding = map(lambda x: x.replace(" ", ""), raw_funding.split("to"))
+                                funding_per_submission = f"Min: {min_funding} Max: {max_funding}"
+                            elif "around" in raw_funding:
+                                funding_per_submission = f"~ {raw_funding.replace('around', '').strip()}"
+                            else:
+                                funding_per_submission = raw_funding
 
-                        # Extract accepted submissions
-                        accepted_submissions = row.select_one('td:nth-child(7)').text.strip()
+                            # Extract accepted submissions
+                            accepted_submissions = row.select_one('td:nth-child(7)').text.strip()
 
-                        # Append to table_data
-                        table_data.append({
-                            "Identifier": identifier,
-                            "Budget": budget,
-                            "Deadline": deadline,
-                            "Funding Per Submission": funding_per_submission,
-                            "Accepted Submissions": accepted_submissions
-                        })
+                            # Append to table_data
+                            table_data.append({
+                                "Identifier": identifier,
+                                "Budget": budget,
+                                "Deadline": deadline,
+                                "Funding Per Submission": funding_per_submission,
+                                "Accepted Submissions": accepted_submissions
+                            })
+
+                    except Exception as e:
+                        print("Table not found, attempting fallback to 'Total funding available'")
+                        # Attempt to locate the budget in "Total funding available"
+                        try:
+                            funding_container = new_tab.locator(
+                                'div.eui-input-group:has(div:has-text("Total funding available"))')
+                            budget_element = funding_container.locator('div.eui-u-font-m')
+                            if budget_element.count() > 0:
+                                raw_budget = budget_element.first.text_content().strip()
+                                budget = raw_budget.replace("\u202f", "").replace(",", "").replace("€", "").strip()
+                                table_data.append({
+                                    "Identifier": "Fallback Identifier",
+                                    "Budget": budget,
+                                    "Deadline": "No deadline found",
+                                    "Funding Per Submission": "No funding info",
+                                    "Accepted Submissions": "No submission info"
+                                })
+                                print(f"Extracted Budget from fallback: {budget}")
+                            else:
+                                print("No budget found in fallback.")
+                        except Exception as fallback_error:
+                            print(f"Error during fallback extraction: {fallback_error}")
+
+                    finally:
+                        # Close the new tab after extraction
+                        new_tab.close()
 
             page.wait_for_selector(next_button_selector)
             # Locate the "Next" button
