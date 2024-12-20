@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
-#TODO fix the "all" option to scroll when needed
 
 def scrape_eu_portal():
     with sync_playwright() as p:
@@ -226,7 +225,7 @@ def scrape_eu_portal():
                                     raw_budget = budget_element.first.text_content().strip()
                                     budget = raw_budget.replace("\u202f", "").replace(",", "").replace("€", "").strip()
                                     table_data.append({
-                                        "Identifier": "Fallback Identifier",
+                                        "Identifier": "No identifier found",
                                         "Budget": budget,
                                         "Deadline": "No deadline found",
                                         "Funding Per Submission": "No funding info",
@@ -315,8 +314,16 @@ def scrape_eu_portal():
                     try:
                         page.click(x_button_selector)
                         print("X button clicked successfully!")
+                        page.wait_for_timeout(2000)
+
+                        submission_status_button_selector = "button.eui-button:has-text('Call')"
+                        page.wait_for_selector(submission_status_button_selector, timeout=30000)
+                        page.click(submission_status_button_selector)
                     except Exception as e:
                         print(f"Error clicking the X button: {e}")
+
+
+                #TODO scroll INSIDE the menu to find the category button to press it
 
                 # Get the text of the selected option
                 selected_option = options[i]
@@ -378,7 +385,7 @@ def scrape_eu_portal():
 
                             try:
                                 # Wait for the table inside the card
-                                new_tab.wait_for_selector('table.eui-table', timeout=10000)
+                                new_tab.wait_for_selector('table.eui-table', timeout=30000)
 
                                 # Extract table data
                                 html = new_tab.content()
@@ -434,7 +441,7 @@ def scrape_eu_portal():
                                         budget = raw_budget.replace("\u202f", "").replace(",", "").replace("€",
                                                                                                            "").strip()
                                         table_data.append({
-                                            "Identifier": "Fallback Identifier",
+                                            "Identifier": "No identifier found",
                                             "Budget": budget,
                                             "Deadline": "No deadline found",
                                             "Funding Per Submission": "No funding info",
