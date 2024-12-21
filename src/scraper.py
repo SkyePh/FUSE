@@ -319,20 +319,50 @@ def scrape_eu_portal():
                         submission_status_button_selector = "button.eui-button:has-text('Call')"
                         page.wait_for_selector(submission_status_button_selector, timeout=30000)
                         page.click(submission_status_button_selector)
+
+                        # Scroll INSIDE the menu to find and click the category button
+                        for j in range(len(options)):
+                            # Get the text of the selected option
+                            selected_option = options[i]
+
+                            # Selector for the dropdown container
+                            dropdown_container_selector = 'div.eui-u-overflow-auto'
+                            # Ensure the dropdown is visible
+                            page.locator(dropdown_container_selector).scroll_into_view_if_needed()
+
+                            # Wait for the dropdown container to be available
+                            dropdown_container = page.locator(dropdown_container_selector)
+                            page.wait_for_selector(dropdown_container_selector, timeout=30000)
+
+                            # Scroll through the dropdown to find the desired option
+
+                            try:
+                                # Try to locate the option
+                                option = dropdown_container.locator(
+                                    f'button.eui-dropdown-item:has(span:text-is("{selected_option}"))')
+                                if option.is_visible():
+                                    option.scroll_into_view_if_needed()
+                                    option.click()
+                                    print(f"Clicked on the option: {selected_option}")
+                                    break  # Break the while loop to process the next option
+                            except Exception:
+                                pass
+
+                            # Scroll down inside the dropdown
+                            dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
+                            page.wait_for_timeout(500)
+
                     except Exception as e:
                         print(f"Error clicking the X button: {e}")
 
-
-                #TODO scroll INSIDE the menu to find the category button to press it
-
-                # Get the text of the selected option
-                selected_option = options[i]
-                # Locate the button with the matching span text
-                matching_button = page.locator(f'button.eui-dropdown-item:has(span:text-is("{selected_option}"))')
-                print(f"Found button for category: {selected_option}")
-                # Click the matching button
-                matching_button.first.click()
-                print("clicked")
+                else:
+                    selected_option = options[i]
+                    # Locate the button with the matching span text
+                    matching_button = page.locator(f'button.eui-dropdown-item:has(span:text-is("{selected_option}"))')
+                    print(f"Found button for category: {selected_option}")
+                    # Click the matching button
+                    matching_button.first.click()
+                    print("clicked")
 
                 # safety delay
                 page.wait_for_timeout(5000)
