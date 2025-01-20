@@ -324,15 +324,13 @@ def scrape_eu_portal():
                     print("Next icon not found or not visible. Exiting pagination.")
                     break
 
-            # Merge titles_data with table_data
+                # Merge data and save to CSV
             table_df = pd.DataFrame(table_data)
             titles_df = pd.DataFrame(titles_data)
-            final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
-            columns_order = ["Title"] + [col for col in final_df.columns if col != "Title"]
-            final_df = final_df[columns_order]
-            # Save to CSV
-            final_df.to_csv(f"{selected_option}.csv", index=False)
-            print(f"Data saved to {selected_option}.csv")
+            if not table_df.empty and not titles_df.empty:
+                final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
+                final_df.to_csv(f"{selected_option}.csv", index=False)
+                print(f"Data saved to {selected_option}.csv")
 
             # Close the browser
             browser.close()
@@ -570,15 +568,13 @@ def scrape_eu_portal():
                         print("Next icon not found or not visible. Exiting pagination.")
                         break
 
-                # Merge titles_data with table_data
+                    # Merge data and save to CSV
                 table_df = pd.DataFrame(table_data)
                 titles_df = pd.DataFrame(titles_data)
-                final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
-                columns_order = ["Title"] + [col for col in final_df.columns if col != "Title"]
-                final_df = final_df[columns_order]
-                # Save to CSV
-                final_df.to_csv(f"{selected_option}.csv", index=False)
-                print(f"Data saved to {selected_option}.csv")
+                if not table_df.empty and not titles_df.empty:
+                    final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
+                    final_df.to_csv(f"{selected_option}.csv", index=False)
+                    print(f"Data saved to {selected_option}.csv")
 
                 i+=1
         # Close the browser
