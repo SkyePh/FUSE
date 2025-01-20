@@ -2,12 +2,58 @@ from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import pandas as pd
 import re
+import os
+
+# Path to folder containing your CSV files
+csv_folder = "."
+
+# Name of the output Excel file
+output_excel = "combined_excel_file.xlsx"
+
+
+def extract_group_name(filename):
+    """Extract the desired part of the filename (e.g., CL4 from HORIZON-CL4-D3-2024)."""
+    parts = filename.split('-')
+    if parts[0]=="HORIZON":
+        return parts[1]
+    else:
+        return parts[0]
+
+def combine_spreadsheet(csv_folder_path, output_excel_file):
+    """Combine CSV files into grouped Excel sheets based on extracted group name."""
+    # Dictionary to store dataframes grouped by the extracted name
+    grouped_dataframes = {}
+
+    # Iterate through all CSV files in the folder
+    for filename in os.listdir(csv_folder_path):
+        if filename.endswith(".csv"):
+            # Extract the group name from the filename
+            group_name = extract_group_name(filename)
+
+            # Read the CSV file into a DataFrame
+            csv_path = os.path.join(csv_folder_path, filename)
+            df = pd.read_csv(csv_path)
+
+            # Add the DataFrame to the appropriate group
+            if group_name not in grouped_dataframes:
+                grouped_dataframes[group_name] = []
+            grouped_dataframes[group_name].append(df)
+
+    # Combine all grouped DataFrames and write to an Excel file
+    with pd.ExcelWriter(output_excel_file) as writer:
+        for group_name, dataframes in grouped_dataframes.items():
+            # Concatenate all DataFrames in the group
+            combined_df = pd.concat(dataframes, ignore_index=True)
+            # Write the combined DataFrame to a sheet
+            combined_df.to_excel(writer, sheet_name=group_name, index=False)
+
+    print(f"All CSV files have been combined and grouped into {output_excel_file}")
 
 
 def scrape_eu_portal():
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=False)  #change to False to run with UI
+        browser = p.chromium.launch(headless=True)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
@@ -540,3 +586,5 @@ def scrape_eu_portal():
 
 
 scrape_eu_portal()
+
+combine_spreadsheet(csv_folder, output_excel)
