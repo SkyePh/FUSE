@@ -53,7 +53,7 @@ def combine_spreadsheet(csv_folder_path, output_excel_file):
 def scrape_eu_portal():
     with sync_playwright() as p:
         # Launch the browser
-        browser = p.chromium.launch(headless=True)  #change to False to run with UI
+        browser = p.chromium.launch(headless=False)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
