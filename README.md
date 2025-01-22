@@ -3,8 +3,8 @@
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/SkyePh/eu-call-scraper.git
-   cd eu-call-scraper
+   git clone https://github.com/SkyePh/FUZE.git
+   cd FUZE
    ```
 2. Install the required dependencies:
 
