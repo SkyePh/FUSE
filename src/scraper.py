@@ -3,6 +3,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 import os
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+
 
 # Path to folder containing your CSV files
 csv_folder = "."
@@ -18,6 +21,19 @@ def extract_group_name(filename):
         return parts[1]
     else:
         return parts[0]
+
+# Create the 'Probability Rate' column
+def calculate_probability_rate(accepted_projects):
+    try:
+        num_projects = int(accepted_projects)
+        if num_projects <= 2:
+            return "Low"
+        elif num_projects == 3:
+            return "Medium"
+        elif num_projects >= 4:
+            return "High"
+    except ValueError:
+        return "Unknown"
 
 def combine_spreadsheet(csv_folder_path, output_excel_file):
     """Combine CSV files into grouped Excel sheets based on extracted group name."""
@@ -39,21 +55,51 @@ def combine_spreadsheet(csv_folder_path, output_excel_file):
                 grouped_dataframes[group_name] = []
             grouped_dataframes[group_name].append(df)
 
-    # Combine all grouped DataFrames and write to an Excel file
-    with pd.ExcelWriter(output_excel_file) as writer:
-        for group_name, dataframes in grouped_dataframes.items():
-            # Concatenate all DataFrames in the group
-            combined_df = pd.concat(dataframes, ignore_index=True)
-            # Write the combined DataFrame to a sheet
-            combined_df.to_excel(writer, sheet_name=group_name, index=False)
+        # Check if there is more than one category
+    if len(grouped_dataframes) > 1:
+        # Combine all grouped DataFrames and write to an Excel file
+        with pd.ExcelWriter(output_excel_file) as writer:
+            for group_name, dataframes in grouped_dataframes.items():
+                # Concatenate all DataFrames in the group
+                combined_df = pd.concat(dataframes, ignore_index=True)
+                # Write the combined DataFrame to a sheet
+                combined_df.to_excel(writer, sheet_name=group_name, index=False)
 
-    print(f"All CSV files have been combined and grouped into {output_excel_file}")
+        # Apply coloring to the Probability Rate column
+        wb = load_workbook(output_excel_file)
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+
+            # Find the "Probability Rate" column
+            headers = [cell.value for cell in sheet[1]]  # Assuming the first row contains headers
+            probability_col_index = headers.index("Probability Rate") + 1
+
+            # Apply coloring
+            for row in range(2, sheet.max_row + 1):  # Skip header row
+                cell = sheet.cell(row=row, column=probability_col_index)
+                if cell.value == "Low":
+                    cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6",
+                                            fill_type="solid")  # Light blue
+                elif cell.value == "Medium":
+                    cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00",
+                                            fill_type="solid")  # Yellow
+                elif cell.value == "High":
+                    cell.fill = PatternFill(start_color="90EE90", end_color="90EE90",
+                                            fill_type="solid")  # Green
+
+        # Save the workbook with the applied styles
+        wb.save(output_excel_file)
+
+        print(f"All CSV files have been combined and grouped into {output_excel_file}")
+    else:
+        print("Only one category selected. Skipping Excel file creation.")
 
 
 def scrape_eu_portal():
     with sync_playwright() as p:
+        print("Searching for calls. Please be patient")
         # Launch the browser
-        browser = p.chromium.launch(headless=False)  #change to False to run with UI
+        browser = p.chromium.launch(headless=True)  #change to False to run with UI
         page = browser.new_page()
 
         # Navigate to the portal
@@ -201,8 +247,11 @@ def scrape_eu_portal():
                     status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
                     status = status_element.text.strip() if status_element else "No status found"
 
+                    # Extract href link
+                    href = title_element['href'] if title_element and title_element.has_attr('href') else "No link"
+
                     # Append to titles_data
-                    titles_data.append({"Identifier": identifier, "Title": title, "Status": status})
+                    titles_data.append({"Identifier": identifier, "Title": title, "Status": status, "Link": href})
 
                 # Open the first card to extract table data or fallback to "Total funding available"
                 if len(table_data) == 0:  # Only fetch data from the first card
@@ -224,11 +273,20 @@ def scrape_eu_portal():
                             soup = BeautifulSoup(html, "html.parser")
                             rows = soup.select('table.eui-table tbody tr')
 
+                            identifier_to_action = {}
+
                             for row in rows:
                                 # Extract identifier and truncate at the first whitespace
                                 identifier_element = row.select_one('td:nth-child(1)')
                                 raw_identifier = identifier_element.text.strip()
                                 identifier = raw_identifier.split(" ")[0] if raw_identifier else "No identifier"
+
+                                # Extract the action type (e.g., RIA, IA)
+                                action_match = re.search(r'-(RIA|IA|CSA|MSCA|EIC)', raw_identifier)
+                                action_type = action_match.group(1) if action_match else "No action"
+
+                                # Add to the temporary dictionary
+                                identifier_to_action[identifier] = action_type
 
                                 # Extract budget
                                 raw_budget = row.select_one('td:nth-child(2)').text.strip()
@@ -254,11 +312,16 @@ def scrape_eu_portal():
                                 # Append to table_data
                                 table_data.append({
                                     "Identifier": identifier,
+                                    "Intensity Rate": "Coming soon",
                                     "Budget": budget,
                                     "Deadline": deadline,
-                                    "Funding Per Submission": funding_per_submission,
-                                    "Accepted Submissions": accepted_submissions
+                                    "Funding Per Project": funding_per_submission,
+                                    "Accepted Projects": accepted_submissions
                                 })
+
+                            # Merge the Action Type into titles_data using the Identifier as the key
+                            for item in titles_data:
+                                item["Action"] = identifier_to_action.get(item["Identifier"], "No action")
 
                         except Exception as e:
                             print("Table not found, attempting fallback to 'Total funding available'")
@@ -272,10 +335,11 @@ def scrape_eu_portal():
                                     budget = raw_budget.replace("\u202f", "").replace(",", "").replace("€", "").strip()
                                     table_data.append({
                                         "Identifier": "No identifier found",
+                                        "Intensity Rate": "Coming soon",
                                         "Budget": budget,
                                         "Deadline": "No deadline found",
-                                        "Funding Per Submission": "No funding info",
-                                        "Accepted Submissions": "No submission info"
+                                        "Funding Per Project": "No funding info",
+                                        "Accepted Projects": "No submission info"
                                     })
                                     print(f"Extracted Budget from fallback: {budget}")
                                 else:
@@ -329,6 +393,13 @@ def scrape_eu_portal():
             titles_df = pd.DataFrame(titles_data)
             if not table_df.empty and not titles_df.empty:
                 final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
+
+                final_df['Probability Rate'] = final_df['Accepted Projects'].apply(calculate_probability_rate)
+
+                # Explicitly rearrange columns so 'Action' comes right after 'Identifier'
+                columns_order = ['Identifier', 'Action'] + [col for col in final_df.columns if
+                                                            col not in ['Identifier', 'Action']]
+                final_df = final_df[columns_order]
                 final_df.to_csv(f"{selected_option}.csv", index=False)
                 print(f"Data saved to {selected_option}.csv")
 
@@ -442,8 +513,11 @@ def scrape_eu_portal():
                         status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
                         status = status_element.text.strip() if status_element else "No status found"
 
+                        # Extract href link
+                        href = title_element['href'] if title_element and title_element.has_attr('href') else "No link"
+
                         # Append to titles_data
-                        titles_data.append({"Identifier": identifier, "Title": title, "Status": status})
+                        titles_data.append({"Identifier": identifier, "Title": title, "Status": status, "Link": href})
 
                     # Open the first card to extract table data or fallback to "Total funding available"
                     if len(table_data) == 0:  # Only fetch data from the first card
@@ -466,11 +540,20 @@ def scrape_eu_portal():
                                 soup = BeautifulSoup(html, "html.parser")
                                 rows = soup.select('table.eui-table tbody tr')
 
+                                identifier_to_action = {}
+
                                 for row in rows:
                                     # Extract identifier and truncate at the first whitespace
                                     identifier_element = row.select_one('td:nth-child(1)')
                                     raw_identifier = identifier_element.text.strip()
                                     identifier = raw_identifier.split(" ")[0] if raw_identifier else "No identifier"
+
+                                    # Extract the action type (e.g., RIA, IA)
+                                    action_match = re.search(r'-(RIA|IA|CSA|MSCA|EIC)', raw_identifier)
+                                    action_type = action_match.group(1) if action_match else "No action"
+
+                                    # Add to the temporary dictionary
+                                    identifier_to_action[identifier] = action_type
 
                                     # Extract budget
                                     raw_budget = row.select_one('td:nth-child(2)').text.strip()
@@ -497,11 +580,16 @@ def scrape_eu_portal():
                                     # Append to table_data
                                     table_data.append({
                                         "Identifier": identifier,
+                                        "Intensity Rate": "Coming soon",
                                         "Budget": budget,
                                         "Deadline": deadline,
-                                        "Funding Per Submission": funding_per_submission,
-                                        "Accepted Submissions": accepted_submissions
+                                        "Funding Per Project": funding_per_submission,
+                                        "Accepted Projects": accepted_submissions
                                     })
+
+                                # Merge the Action Type into titles_data using the Identifier as the key
+                                for item in titles_data:
+                                    item["Action"] = identifier_to_action.get(item["Identifier"], "No action")
 
                             except Exception as e:
                                 print("Table not found, attempting fallback to 'Total funding available'")
@@ -516,10 +604,11 @@ def scrape_eu_portal():
                                                                                                            "").strip()
                                         table_data.append({
                                             "Identifier": "No identifier found",
+                                            "Intensity Rate": "Coming soon",
                                             "Budget": budget,
                                             "Deadline": "No deadline found",
-                                            "Funding Per Submission": "No funding info",
-                                            "Accepted Submissions": "No submission info"
+                                            "Funding Per Project": "No funding info",
+                                            "Accepted Projects": "No submission info"
                                         })
                                         print(f"Extracted Budget from fallback: {budget}")
                                     else:
@@ -573,6 +662,16 @@ def scrape_eu_portal():
                 titles_df = pd.DataFrame(titles_data)
                 if not table_df.empty and not titles_df.empty:
                     final_df = pd.merge(table_df, titles_df, on="Identifier", how="left")
+                    # Ensure the 'Action' column exists, even if it's missing in titles_data
+                    if 'Action' not in final_df.columns:
+                        final_df['Action'] = "No action"
+
+                    final_df['Probability Rate'] = final_df['Accepted Projects'].apply(calculate_probability_rate)
+
+                    # Rearrange columns: 'Identifier', 'Action' first
+                    columns_order = ['Identifier', 'Action'] + [col for col in final_df.columns if
+                                                                col not in ['Identifier', 'Action']]
+                    final_df = final_df[columns_order]
                     final_df.to_csv(f"{selected_option}.csv", index=False)
                     print(f"Data saved to {selected_option}.csv")
 
