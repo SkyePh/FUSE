@@ -3,9 +3,11 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 import os
+from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
+#TODO fix some categories not finding any results
 
 # Path to folder containing your CSV files
 csv_folder = "."
@@ -34,6 +36,22 @@ def calculate_probability_rate(accepted_projects):
             return "High"
     except ValueError:
         return "Unknown"
+
+def format_date(date_string):
+    try:
+        # Check if there are two dates separated by a space
+        dates = date_string.split()
+        formatted_dates = []
+
+        for date in dates:
+            # Parse each date and format it
+            date_object = datetime.strptime(date, "%Y-%m-%d")
+            formatted_dates.append(date_object.strftime("%d %b %Y").upper())
+
+        # Join the formatted dates with a space
+        return " ".join(formatted_dates)
+    except ValueError:
+        return date_string  # Return the original string if parsing fails
 
 def combine_spreadsheet(csv_folder_path, output_excel_file):
     """Combine CSV files into grouped Excel sheets based on extracted group name."""
@@ -294,6 +312,7 @@ def scrape_eu_portal():
 
                                 # Extract deadline
                                 deadline = row.select_one('td:nth-child(5)').text.strip()
+                                formatted_deadline = format_date(deadline)
 
                                 # Extract funding per submission
                                 funding_element = row.select_one('td:nth-child(6)')
@@ -314,7 +333,7 @@ def scrape_eu_portal():
                                     "Identifier": identifier,
                                     "Intensity Rate": "Coming soon",
                                     "Budget": budget,
-                                    "Deadline": deadline,
+                                    "Deadline": formatted_deadline,
                                     "Funding Per Project": funding_per_submission,
                                     "Accepted Projects": accepted_submissions
                                 })
@@ -561,6 +580,7 @@ def scrape_eu_portal():
 
                                     # Extract deadline
                                     deadline = row.select_one('td:nth-child(5)').text.strip()
+                                    formatted_deadline = format_date(deadline)
 
                                     # Extract funding per submission
                                     funding_element = row.select_one('td:nth-child(6)')
@@ -582,7 +602,7 @@ def scrape_eu_portal():
                                         "Identifier": identifier,
                                         "Intensity Rate": "Coming soon",
                                         "Budget": budget,
-                                        "Deadline": deadline,
+                                        "Deadline": formatted_deadline,
                                         "Funding Per Project": funding_per_submission,
                                         "Accepted Projects": accepted_submissions
                                     })
