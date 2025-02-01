@@ -2,3 +2,6 @@ playwright
 pandas
 bs4
 openpyxl
+uvicorn
+fastapi
+asyncio

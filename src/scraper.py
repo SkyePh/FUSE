@@ -1,4 +1,7 @@
-from playwright.sync_api import sync_playwright
+#TODO implement FastAPI
+
+from playwright.async_api import async_playwright
+import asyncio
 from bs4 import BeautifulSoup
 import pandas as pd
 import re
@@ -7,7 +10,7 @@ from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-#TODO fix some categories not finding any results
+#TODO prompt validation
 
 # Path to folder containing your CSV files
 csv_folder = "."
@@ -110,32 +113,77 @@ def combine_spreadsheet(csv_folder_path, output_excel_file):
     print(f"Excel file created: {output_excel_file}")
 
 
-def scrape_eu_portal():
-    with sync_playwright() as p:
+async def scrape_eu_portal():
+    async with async_playwright() as p:
+
+        closed_option = input("Would you like to scrape the closed calls as well? (yes/no): ")
+        closed_true = False
+        while True:
+            if closed_option == "yes":
+                closed_true = True
+                break
+            elif closed_option == "no":
+                break
+            else:
+                print("Invalid option. Please try again.")
+
+
         print("Searching for calls. Please be patient")
         # Launch the browser
-        browser = p.chromium.launch(headless=True)  #change to False to run with UI
-        page = browser.new_page()
+        browser = await p.chromium.launch(headless=True)  #change to False to run with UI
+        page = await browser.new_page()
 
         # Navigate to the portal
-        page.goto("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals")
+        await page.goto("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals")
 
     # ======================================= Apply Filters ===========================================
 
+        #choose closed or not
+        status_button = "button.eui-button:has-text('Submission status')"
+        await page.wait_for_selector(status_button)
+        await page.click(status_button)
+
+        if closed_true:
+            # Locate the checkbox using its 'id' or other attributes
+            checkbox = page.locator("input.eui-input-checkbox[id='31094503']")
+
+            # Check if the checkbox is currently unchecked
+            is_checked = await checkbox.is_checked()
+
+            # If it's not checked, click to check it
+            if not is_checked:
+                await checkbox.click()
+                print("Checkbox was unchecked. Now checked.")
+            else:
+                print("Checkbox was already checked.")
+        else:
+            # Locate the checkbox using its 'id' or other attributes
+            checkbox = page.locator("input.eui-input-checkbox[id='31094503']")
+
+            # Check if the checkbox is currently unchecked
+            is_checked = await checkbox.is_checked()
+
+            # If it's not checked, click to check it
+            if is_checked:
+                await checkbox.click()
+                print("Checkbox was checked. Now unchecked.")
+            else:
+                print("Checkbox was already unchecked.")
+
         # Press the Programme button
         button_selector = "button[data-e2e='eui-button']:has-text('Programme')"
-        page.wait_for_selector(button_selector)
-        page.click(button_selector)
+        await page.wait_for_selector(button_selector)
+        await page.click(button_selector)
 
         # Press the HORIZON button
         horizon_button_selector = "button.eui-dropdown-item:has-text('Horizon Europe (HORIZON)')"
-        page.wait_for_selector(horizon_button_selector, timeout=30000)
-        page.click(horizon_button_selector)
+        await page.wait_for_selector(horizon_button_selector, timeout=30000)
+        await page.click(horizon_button_selector)
 
         # Press the Call button
         submission_status_button_selector = "button.eui-button:has-text('Call')"
-        page.wait_for_selector(submission_status_button_selector, timeout=30000)
-        page.click(submission_status_button_selector)
+        await page.wait_for_selector(submission_status_button_selector, timeout=30000)
+        await page.click(submission_status_button_selector)
 
         #============ fetch all the available calls and ask to choose one ====================
 
@@ -143,25 +191,25 @@ def scrape_eu_portal():
         dropdown_container_selector = 'div.eui-u-overflow-auto'
 
         # Wait for the dropdown container to load
-        page.wait_for_selector(dropdown_container_selector, timeout=30000)
+        await page.wait_for_selector(dropdown_container_selector, timeout=30000)
 
         # Locate the dropdown container
         dropdown_container = page.locator(dropdown_container_selector)
 
         # Scroll through the dropdown container to ensure all items are visible
-        dropdown_container.evaluate('(node) => node.scrollTop = 0')  # Start at the top
+        await dropdown_container.evaluate('(node) => node.scrollTop = 0')  # Start at the top
 
         # Continuously scroll until all items are loaded
         previous_item_count = 0
         while True:
             # Get the current number of buttons
-            current_item_count = dropdown_container.locator('button.eui-dropdown-item').count()
+            current_item_count = await dropdown_container.locator('button.eui-dropdown-item').count()
 
             if current_item_count > previous_item_count:
                 previous_item_count = current_item_count
                 # Scroll further down
-                dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
-                page.wait_for_timeout(500)  # Wait for the content to load
+                await dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
+                await page.wait_for_timeout(500)  # Wait for the content to load
             else:
                 # Stop scrolling if no new items are being loaded
                 break
@@ -179,12 +227,12 @@ def scrape_eu_portal():
                 # Locate the specific span with 'eui-u-pr-s' class
                 span = buttons.nth(i).locator('span.eui-u-pr-s')
 
-                if span.count() > 0:
-                    # Extract the text content
-                    span_text = span.evaluate('(node) => node.childNodes[0]?.nodeValue').strip()
-                    options.append(span_text)
-                else:
-                    print(f"No relevant span found for button {i}.")
+                # Extract the text content
+                span_text = await span.evaluate('(node) => node.childNodes[0]?.nodeValue')
+                if span_text:
+                    span_text = span_text.strip()
+                options.append(span_text)
+
             except Exception as e:
                 print(f"Error processing button {i}: {e}")
 
@@ -220,27 +268,27 @@ def scrape_eu_portal():
             if counter_for_menu > 0:
                 # Press the Call button
                 submission_status_button_selector = f"button.eui-button:has-text('{selected_categories[counter_for_menu - 1]}')"
-                page.wait_for_selector(submission_status_button_selector, timeout=30000)
-                page.click(submission_status_button_selector)
+                await page.wait_for_selector(submission_status_button_selector, timeout=30000)
+                await page.click(submission_status_button_selector)
 
                 # Define the button selector specifically for the "X" button
                 x_button_selector = 'button.eui-button--basic.eui-button--icon-only[data-e2e="eui-button"] eui-icon-svg[icon="eui-close"]'
 
                 # Wait for the button to appear and ensure it is visible
-                page.wait_for_selector(x_button_selector, timeout=5000)
+                await page.wait_for_selector(x_button_selector, timeout=5000)
 
                 # Scroll to the button to ensure it's in view
-                page.locator(x_button_selector).scroll_into_view_if_needed()
+                await page.locator(x_button_selector).scroll_into_view_if_needed()
 
                 # Click the button
                 try:
-                    page.click(x_button_selector)
+                    await page.click(x_button_selector)
                     print("X button clicked successfully!")
-                    page.wait_for_timeout(2000)
+                    await page.wait_for_timeout(2000)
 
                     submission_status_button_selector = "button.eui-button:has-text('Call')"
-                    page.wait_for_selector(submission_status_button_selector, timeout=30000)
-                    page.click(submission_status_button_selector)
+                    await page.wait_for_selector(submission_status_button_selector, timeout=30000)
+                    await page.click(submission_status_button_selector)
 
                     # Scroll INSIDE the menu to find and click the category button
                     for j in range(len(selected_categories)):
@@ -248,11 +296,11 @@ def scrape_eu_portal():
                         # Selector for the dropdown container
                         dropdown_container_selector = 'div.eui-u-overflow-auto'
                         # Ensure the dropdown is visible
-                        page.locator(dropdown_container_selector).scroll_into_view_if_needed()
+                        await page.locator(dropdown_container_selector).scroll_into_view_if_needed()
 
                         # Wait for the dropdown container to be available
                         dropdown_container = page.locator(dropdown_container_selector)
-                        page.wait_for_selector(dropdown_container_selector, timeout=30000)
+                        await page.wait_for_selector(dropdown_container_selector, timeout=30000)
 
                         # Scroll through the dropdown to find the desired option
 
@@ -260,17 +308,17 @@ def scrape_eu_portal():
                             # Try to locate the option
                             option = dropdown_container.locator(
                                 f'button.eui-dropdown-item:has(span:text-is("{category}"))')
-                            if option.is_visible():
-                                option.scroll_into_view_if_needed()
-                                option.click()
+                            if await option.is_visible():
+                                await option.scroll_into_view_if_needed()
+                                await option.click()
                                 print(f"Clicked on the option: {category}")
                                 break  # Break the while loop to process the next option
                         except Exception:
                             pass
 
                         # Scroll down inside the dropdown
-                        dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
-                        page.wait_for_timeout(500)
+                        await dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
+                        await page.wait_for_timeout(500)
 
                 except Exception as e:
                     print(f"Error clicking the X button: {e}")
@@ -280,11 +328,11 @@ def scrape_eu_portal():
                 matching_button = page.locator(f'button.eui-dropdown-item:has(span:text-is("{category}"))')
                 print(f"Found button for category: {category}")
                 # Click the matching button
-                matching_button.first.click()
+                await matching_button.first.click()
                 print("clicked")
 
             # safety delay
-            page.wait_for_timeout(5000)
+            await page.wait_for_timeout(5000)
 
             next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
             next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
@@ -295,10 +343,10 @@ def scrape_eu_portal():
 
             while True:
                 # Wait for results to load
-                page.wait_for_selector("sedia-result-card")
+                await page.wait_for_selector("sedia-result-card")
 
                 # Extract the HTML content
-                html = page.content()
+                html = await page.content()
                 soup = BeautifulSoup(html, "html.parser")
 
                 # Extract results on the current page
@@ -331,16 +379,16 @@ def scrape_eu_portal():
 
                     if first_call_link:
                         # Open a new tab for the first call details page
-                        new_tab = browser.new_page()
-                        new_tab.goto(f"https://ec.europa.eu{first_call_link}")
+                        new_tab = await browser.new_page()
+                        await new_tab.goto(f"https://ec.europa.eu{first_call_link}")
                         print(f"Opened first call link in a new tab: {first_call_link}")
 
                         try:
                             # Wait for the table inside the card
-                            new_tab.wait_for_selector('table.eui-table', timeout=30000)
+                            await new_tab.wait_for_selector('table.eui-table', timeout=30000)
 
                             # Extract table data
-                            html = new_tab.content()
+                            html = await new_tab.content()
                             soup = BeautifulSoup(html, "html.parser")
                             rows = soup.select('table.eui-table tbody tr')
 
@@ -400,11 +448,11 @@ def scrape_eu_portal():
                             print("Table not found, attempting fallback to 'Total funding available'")
                             # Attempt to locate the budget in "Total funding available"
                             try:
-                                funding_container = new_tab.locator(
+                                funding_container =  new_tab.locator(
                                     'div.eui-input-group:has(div:has-text("Total funding available"))')
                                 budget_element = funding_container.locator('div.eui-u-font-m')
-                                if budget_element.count() > 0:
-                                    raw_budget = budget_element.first.text_content().strip()
+                                if await budget_element.count() > 0:
+                                    raw_budget = (await budget_element.first.text_content()).strip()
                                     budget = raw_budget.replace("\u202f", "").replace(",", "").replace("€",
                                                                                                        "").strip()
                                     table_data.append({
@@ -423,16 +471,16 @@ def scrape_eu_portal():
 
                         finally:
                             # Close the new tab after extraction
-                            new_tab.close()
+                            await new_tab.close()
 
-                page.wait_for_selector(next_button_selector)
+                await page.wait_for_selector(next_button_selector)
                 # Locate the "Next" button
                 next_button = page.locator(next_button_selector)
                 # Debugging output
                 print("Checking Next button state...")
-                if next_button.count() > 0:
+                if  await next_button.count() > 0:
                     # Check if the button is disabled
-                    is_disabled = next_button.evaluate("(button) => button.disabled")
+                    is_disabled = await next_button.evaluate("(button) => button.disabled")
                     print(f"Is Next button disabled: {is_disabled}")
 
                     if is_disabled:
@@ -443,7 +491,7 @@ def scrape_eu_portal():
                     break
 
                 # Wait for the eui-icon-svg element to appear
-                page.wait_for_selector(next_icon_selector, timeout=20000)
+                await page.wait_for_selector(next_icon_selector, timeout=20000)
 
                 # Locate the icon
                 next_icon = page.locator(next_icon_selector)
@@ -453,11 +501,11 @@ def scrape_eu_portal():
                 print("Next icon visible:", next_icon.is_visible())
 
                 # Click the icon if available
-                if next_icon.count() > 0 and next_icon.is_visible():
-                    next_icon.click()
+                if  await next_icon.count() > 0 and await next_icon.is_visible():
+                    await next_icon.click()
                     print("Clicked the 'Next' icon.")
                     print("waiting for 30 sec to load next page")
-                    page.wait_for_timeout(30000)
+                    await page.wait_for_timeout(30000)
                 else:
                     print("Next icon not found or not visible. Exiting pagination.")
                     break
@@ -483,8 +531,8 @@ def scrape_eu_portal():
             counter_for_menu+=1
 
         # Close the browser
-        browser.close()
+        await browser.close()
 
-scrape_eu_portal()
+asyncio.run(scrape_eu_portal())
 
 combine_spreadsheet(csv_folder, output_excel)
