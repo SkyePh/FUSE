@@ -10,7 +10,6 @@ from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-#TODO prompt validation
 
 # Path to folder containing your CSV files
 csv_folder = "."
@@ -113,19 +112,18 @@ def combine_spreadsheet(csv_folder_path, output_excel_file):
     print(f"Excel file created: {output_excel_file}")
 
 
-async def scrape_eu_portal():
+async def scrape_eu_portal(closed_option: bool = False, desired_category: list = None):
     async with async_playwright() as p:
 
-        closed_option = input("Would you like to scrape the closed calls as well? (yes/no): ")
+        # closed_option = input("Would you like to scrape the closed calls as well? (yes/no): ")
         closed_true = False
         while True:
-            if closed_option == "yes":
+            if closed_option:
                 closed_true = True
                 break
-            elif closed_option == "no":
+            elif not closed_option:
                 break
-            else:
-                print("Invalid option. Please try again.")
+
 
 
         print("Searching for calls. Please be patient")
@@ -201,18 +199,17 @@ async def scrape_eu_portal():
 
         # Continuously scroll until all items are loaded
         previous_item_count = 0
-        while True:
-            # Get the current number of buttons
+        max_scroll_attempts = 10  # Prevent infinite scrolling
+
+        for _ in range(max_scroll_attempts):
             current_item_count = await dropdown_container.locator('button.eui-dropdown-item').count()
 
             if current_item_count > previous_item_count:
                 previous_item_count = current_item_count
-                # Scroll further down
                 await dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
-                await page.wait_for_timeout(500)  # Wait for the content to load
+                await asyncio.sleep(0.5)  # Use asyncio.sleep()
             else:
-                # Stop scrolling if no new items are being loaded
-                break
+                break  # Exit loop if no new items are loaded
 
         print(f"Total buttons found after scrolling: {previous_item_count}")
 
@@ -246,11 +243,11 @@ async def scrape_eu_portal():
             print(menu_option_call, ") ", options[i])
             menu_option_call += 1
 
+        # TODO prompt validation
+        # print("\nTo choose multiple the format is for example 1,2,3,4")
+        # desired_category = input("\nPlease choose which category you would like to scrape('0' for all): ")
 
-        print("To choose multiple the format is for example 1,2,3,4")
-        desired_category = input("\nPlease choose which category you would like to scrape('0' for all): ")
-
-        selected_categories_temp = [int(num.strip()) for num in desired_category.split(",")]
+        selected_categories_temp = [int(num) for num in desired_category]
 
         selected_categories = [options[num - 1] for num in selected_categories_temp if 1 <= num <= len(options)]
 
@@ -264,7 +261,7 @@ async def scrape_eu_portal():
 
         counter_for_menu = 0
         for category in selected_categories:
-
+            await asyncio.sleep(0.5)  # 500ms
             if counter_for_menu > 0:
                 # Press the Call button
                 submission_status_button_selector = f"button.eui-button:has-text('{selected_categories[counter_for_menu - 1]}')"
@@ -284,7 +281,7 @@ async def scrape_eu_portal():
                 try:
                     await page.click(x_button_selector)
                     print("X button clicked successfully!")
-                    await page.wait_for_timeout(2000)
+                    await asyncio.sleep(2)
 
                     submission_status_button_selector = "button.eui-button:has-text('Call')"
                     await page.wait_for_selector(submission_status_button_selector, timeout=30000)
@@ -318,7 +315,7 @@ async def scrape_eu_portal():
 
                         # Scroll down inside the dropdown
                         await dropdown_container.evaluate('(node) => node.scrollBy(0, 200)')
-                        await page.wait_for_timeout(500)
+                        await asyncio.sleep(0.5)  # 500ms
 
                 except Exception as e:
                     print(f"Error clicking the X button: {e}")
@@ -332,7 +329,7 @@ async def scrape_eu_portal():
                 print("clicked")
 
             # safety delay
-            await page.wait_for_timeout(5000)
+            await asyncio.sleep(5)  # 5s
 
             next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
             next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
@@ -505,7 +502,8 @@ async def scrape_eu_portal():
                     await next_icon.click()
                     print("Clicked the 'Next' icon.")
                     print("waiting for 30 sec to load next page")
-                    await page.wait_for_timeout(30000)
+                    await asyncio.sleep(30)
+
                 else:
                     print("Next icon not found or not visible. Exiting pagination.")
                     break
@@ -533,6 +531,6 @@ async def scrape_eu_portal():
         # Close the browser
         await browser.close()
 
-asyncio.run(scrape_eu_portal())
+# asyncio.run(scrape_eu_portal())
 
-combine_spreadsheet(csv_folder, output_excel)
+# combine_spreadsheet(csv_folder, output_excel)
