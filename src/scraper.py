@@ -7,7 +7,12 @@ import os
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+import json
 
+#TODO wtf bug with finding the closed ones too? idk man
+
+# Save results in JSON format
+results_json_path = "scraped_results.json"
 
 # Path to folder containing your CSV files
 csv_folder = "."
@@ -110,7 +115,7 @@ def combine_spreadsheet(csv_folder_path, output_excel_file):
     print(f"Excel file created: {output_excel_file}")
 
 
-async def scrape_eu_portal(closed_option: bool = False, desired_category: list = None):
+async def scrape_eu_portal(closed_option: bool = False, desired_category: list = None, get_categories_only: bool = False):
     async with async_playwright() as p:
 
         # closed_option = input("Would you like to scrape the closed calls as well? (yes/no): ")
@@ -241,19 +246,20 @@ async def scrape_eu_portal(closed_option: bool = False, desired_category: list =
             print(menu_option_call, ") ", options[i])
             menu_option_call += 1
 
+        if get_categories_only:
+            await browser.close()
+            return options  # Return list of categories to `/home`
+
         # TODO prompt validation
         # print("\nTo choose multiple the format is for example 1,2,3,4")
         # desired_category = input("\nPlease choose which category you would like to scrape('0' for all): ")
 
-        selected_categories_temp = [int(num) for num in desired_category]
+        selected_categories = [category for category in desired_category if category in options]
 
-        selected_categories = [options[num - 1] for num in selected_categories_temp if 1 <= num <= len(options)]
-
-        if desired_category == "0":
-
+        if "0" in desired_category:  # If "0" is provided, select all
             selected_categories = options
 
-        print(selected_categories)
+        print(selected_categories)  # ✅ Now prints category names correctly
 
         # ============================ Pagination and Data Extraction =====================================
 
@@ -523,6 +529,29 @@ async def scrape_eu_portal(closed_option: bool = False, desired_category: list =
                 final_df = final_df[columns_order]
                 final_df.to_csv(f"{category}.csv", index=False)
                 print(f"Data saved to {category}.csv")
+
+                # --- JSON Saving Logic ---
+                results_json_path = "scraped_results.json"
+
+                # Load existing data if file exists
+                if os.path.exists(results_json_path):
+                    try:
+                        with open(results_json_path, "r", encoding="utf-8") as file:
+                            existing_data = json.load(file)
+                    except json.JSONDecodeError:
+                        existing_data = []  # Reset if file is corrupted
+                else:
+                    existing_data = []
+
+                # Append new data
+                new_data = final_df.to_dict(orient="records")  # Convert DataFrame to list of dicts
+                existing_data.extend(new_data)  # Merge new results
+
+                # Save updated data back to file
+                with open(results_json_path, "w", encoding="utf-8") as file:
+                    json.dump(existing_data, file, indent=4)
+
+                print(f"Results saved to {results_json_path}")
 
             counter_for_menu+=1
 

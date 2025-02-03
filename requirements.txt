@@ -6,3 +6,5 @@ uvicorn
 fastapi
 asyncio
 pydantic
+jinja2
+python-multipart
