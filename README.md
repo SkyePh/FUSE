@@ -17,7 +17,14 @@
   playwright install
   ```
 
-## Usage
+## Usage for 
 
    ```bash
-   python src/scraper.py
+   cd src
+   ```
+
+   ```bash
+   uvicorn api:app --host 127.0.0.1 --port 5000
+   ```
+
+## DO NOT RUN WITH --reload
