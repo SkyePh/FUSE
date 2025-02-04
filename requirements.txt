@@ -8,3 +8,5 @@ asyncio
 pydantic
 jinja2
 python-multipart
+starlette
+itsdangerous

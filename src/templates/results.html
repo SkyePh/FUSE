@@ -9,6 +9,11 @@
 <body class="bg-gray-100 text-gray-900">
     <div class="container mx-auto p-6">
         <h1 class="text-2xl font-bold mb-4">Scraped Results</h1>
+        <div class="flex justify-end mb-4">
+            <a href="/export-excel" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                Export to Excel
+            </a>
+        </div>
 
         {% if data %}
             <table class="table-auto w-full border-collapse border border-gray-400 bg-white">
@@ -26,7 +31,11 @@
                     {% for row in data %}
                         <tr class="hover:bg-gray-100">
                             <td class="border border-gray-400 px-4 py-2">{{ row["Identifier"] }}</td>
-                            <td class="border border-gray-400 px-4 py-2">{{ row["Title"] }}</td>
+                            <td class="border border-gray-400 px-4 py-2">
+                                <a href="{{ row['Link'] }}" target="_blank" class="text-blue-500 hover:underline">
+                                    {{ row["Title"] }}
+                                </a>
+                            </td>
                             <td class="border border-gray-400 px-4 py-2">{{ row["Budget"] }}</td>
                             <td class="border border-gray-400 px-4 py-2">{{ row["Deadline"] }}</td>
                             <td class="border border-gray-400 px-4 py-2">{{ row["Funding Per Project"] }}</td>

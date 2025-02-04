@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EU Call Scraper</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function submitForm() {
+            let form = document.getElementById("categoryForm");
+            let selectedCategories = [];
+
+            // Collect selected checkboxes
+            document.querySelectorAll("input[name='categories']:checked").forEach((checkbox) => {
+                selectedCategories.push(checkbox.value);
+            });
+
+            if (selectedCategories.length === 0) {
+                alert("Please select at least one category.");
+                return;
+            }
+
+            // Add selected categories to a hidden input
+            document.getElementById("selectedCategories").value = selectedCategories.join(",");
+
+            // Submit form
+            form.submit();
+        }
+    </script>
 </head>
 <body class="bg-gray-100 p-6">
     <div class="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-lg">
@@ -16,7 +38,7 @@
                 <span>{{ category }}</span>
             </label>
             {% endfor %}
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 w-full">
+            <button type="submit" onclick="submitForm()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 w-full">
                 Start Scraping
             </button>
         </form>

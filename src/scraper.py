@@ -127,7 +127,8 @@ async def scrape_eu_portal(closed_option: bool = False, desired_category: list =
             elif not closed_option:
                 break
 
-
+        # Create "scraping in progress" flag
+        open("scraping_in_progress.json", "w").close()
 
         print("Searching for calls. Please be patient")
         # Launch the browser
@@ -370,7 +371,7 @@ async def scrape_eu_portal(closed_option: bool = False, desired_category: list =
                     href = title_element['href'] if title_element and title_element.has_attr('href') else "No link"
 
                     # Append to titles_data
-                    titles_data.append({"Identifier": identifier, "Title": title, "Status": status, "Link": href})
+                    titles_data.append({"Identifier": identifier, "Title": title, "Status": status, "Link": "https://ec.europa.eu"+href})
 
                 # Open the first card to extract table data or fallback to "Total funding available"
                 if len(table_data) == 0:  # Only fetch data from the first card
@@ -555,6 +556,7 @@ async def scrape_eu_portal(closed_option: bool = False, desired_category: list =
 
             counter_for_menu+=1
 
+        os.remove("scraping_in_progress.json")
         # Close the browser
         await browser.close()
 
