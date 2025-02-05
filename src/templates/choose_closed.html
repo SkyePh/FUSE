@@ -3,20 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Select Call Type</title>
+    <title>Choose Call Type</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="flex items-center justify-center h-screen bg-gray-100">
-    <div class="bg-white p-6 rounded-lg shadow-md text-center">
-        <h1 class="text-xl font-semibold mb-4">Do you want to include closed calls?</h1>
-        <form action="/home" method="get">
-            <button type="submit" name="closed" value="true" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+    <form action="/fetching_calls_loading" method="get" class="bg-white p-6 rounded-lg shadow-lg text-center">
+        <h2 class="text-2xl font-semibold text-gray-900">Include closed calls?</h2>
+        <p class="mt-2 text-gray-500">Would you like to include closed calls in your search?</p>
+
+        <div class="mt-4 flex justify-center space-x-4">
+            <button type="submit" name="closed" value="true" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
                 Yes
             </button>
-            <button type="submit" name="closed" value="false" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+            <button type="submit" name="closed" value="false" class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
                 No
             </button>
-        </form>
-    </div>
+        </div>
+    </form>
 </body>
 </html>

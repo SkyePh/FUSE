@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, BackgroundTasks
+from fastapi import FastAPI, Request, Form, BackgroundTasks, Query
 from fastapi.responses import RedirectResponse, FileResponse
 from typing import List
 import pandas as pd
@@ -36,30 +36,36 @@ async def root():
 from fastapi.responses import RedirectResponse
 
 @app.get("/home")
-async def home(request: Request, closed: bool = None):
+async def home(request: Request):
     """
     Step 1: Ask if the user wants closed calls.
     Step 2: Show loading page while fetching categories.
     """
-    if closed is None:
-        return templates.TemplateResponse("choose_closed.html", {"request": request})
+    # if closed is None:
+    #     return templates.TemplateResponse("choose_closed.html", {"request": request})
 
-    return RedirectResponse(url=f"/fetching_calls_loading?redirect_url=/fetch-categories?closed={closed}")
+    return templates.TemplateResponse("home.html", {"request": request})
 
+@app.get("/choose_closed")
+async def choose_closed(request: Request):
+    """
+    Ask user whether they want closed calls.
+    """
+    return templates.TemplateResponse("choose_closed.html", {"request": request})
 
 @app.get("/fetch-categories")
-async def fetch_categories(request: Request, closed: bool):
+async def fetch_categories(request: Request, closed: bool = Query(...)):
     """
-    Fetch categories asynchronously, then redirect to home with data.
+    Fetch categories asynchronously, then redirect to selection page.
     """
     categories = await scrape_eu_portal(get_categories_only=True, closed_option=closed)
 
-    # Store categories in session (or temp storage)
+    # Store categories in session
     request.session["categories"] = categories
     request.session["closed"] = closed
 
-    # Redirect back to home when done
-    return RedirectResponse(url="/categories")
+    # Redirect to category selection page
+    return RedirectResponse(url="/categories", status_code=303)
 
 @app.get("/categories")
 async def categories_page(request: Request):
@@ -90,9 +96,12 @@ async def loading_page(request: Request, redirect_url: str):
 
 
 @app.get("/fetching_calls_loading")
-async def fetching_calls_loading(request: Request, redirect_url: str):
+async def fetching_calls_loading(request: Request, closed: bool):
+    """
+    Show the loading screen AFTER selecting closed calls, then fetch categories.
+    """
+    return templates.TemplateResponse("loading_after_closed_choice.html", {"request": request, "redirect_url": f"/fetch-categories?closed={closed}"})
 
-    return templates.TemplateResponse("loading_after_closed_choice.html", {"request": request, "redirect_url": redirect_url})
 @app.post("/scrape")
 async def scrape_endpoint(
     request: Request,
