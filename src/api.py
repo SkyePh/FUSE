@@ -69,7 +69,7 @@ async def categories_page(request: Request):
     categories = request.session.get("categories", [])
     closed = request.session.get("closed", False)
 
-    return templates.TemplateResponse("home.html", {"request": request, "categories": categories, "closed": closed})
+    return templates.TemplateResponse("options.html", {"request": request, "categories": categories, "closed": closed})
 
 @app.get("/loading")
 async def loading_page(request: Request, redirect_url: str):
@@ -79,12 +79,12 @@ async def loading_page(request: Request, redirect_url: str):
 
     progress_flag = "scraping_in_progress.json"
 
-    wait_interval = 10
+    #wait_interval = 3
 
     if not os.path.exists(progress_flag):  # ✅ Only continue when flag is removed
         return RedirectResponse(url=redirect_url)
 
-    await asyncio.sleep(wait_interval)
+    #await asyncio.sleep(wait_interval)
 
     return templates.TemplateResponse("loading.html", {"request": request, "redirect_url": redirect_url})
 
