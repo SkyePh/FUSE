@@ -9,8 +9,6 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 import json
 
-#TODO wtf bug with finding the closed ones too? idk man
-
 # Save results in JSON format
 results_json_path = "scraped_results.json"
 
@@ -479,7 +477,6 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
             await browser.close()
             return options  # Return list of categories to `/home`
 
-        # TODO prompt validation
         # print("\nTo choose multiple the format is for example 1,2,3,4")
         # desired_category = input("\nPlease choose which category you would like to scrape('0' for all): ")
 
