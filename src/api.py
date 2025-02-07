@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, Form, BackgroundTasks, Query
 from fastapi.responses import RedirectResponse, FileResponse
-from typing import List
+from typing import List, Optional
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from scraper import scrape_eu_portal
 import sys
 import os
+from urllib.parse import urlencode
 import json
 
 # Windows-specific fix for Playwright subprocess execution
@@ -53,29 +54,76 @@ async def choose_closed(request: Request):
     """
     return templates.TemplateResponse("choose_closed.html", {"request": request})
 
-@app.get("/fetch-categories")
-async def fetch_categories(request: Request, closed: bool = Query(...)):
-    """
-    Fetch categories asynchronously, then redirect to selection page.
-    """
-    categories = await scrape_eu_portal(get_categories_only=True, closed_option=closed)
 
-    # Store categories in session
-    request.session["categories"] = categories
-    request.session["closed"] = closed
 
-    # Redirect to category selection page
-    return RedirectResponse(url="/categories", status_code=303)
+# def parse_checkbox(value: Optional[str]) -> bool:
+#     """
+#     Convert the checkbox value to a boolean.
+#     - If the value is None (checkbox not submitted), return False.
+#     - If the value exists, return True.
+#     """
+#     return value is not None and value.lower() in ["on", "true", "1", "yes"]
+
+
+@app.post("/fetch-categories")
+async def fetch_categories(
+    request: Request,
+    statuses: Optional[List[str]] = Form([]),
+    keyword: Optional[str] = Form("")
+):
+    """
+    Fetch categories and pass them directly to /categories via query parameters.
+    """
+
+    # Convert checkbox statuses to booleans
+    closed_bool = "closed" in statuses
+    forthcoming_bool = "forthcoming" in statuses
+    open_bool = "open" in statuses
+
+    print(f"Closed: {closed_bool}, Forthcoming: {forthcoming_bool}, Open: {open_bool}")
+
+    # Fetch categories from scraper
+    categories = await scrape_eu_portal(
+        get_categories_only=True,
+        closed_option=closed_bool,
+        forthcoming_option=forthcoming_bool,
+        open_option=open_bool,
+        keyword=keyword
+    )
+
+    print("✅ Categories Retrieved from Scraper:", categories)
+
+    # Encode query parameters
+    query_params = urlencode({
+        "categories": categories,
+        "closed": closed_bool,
+        "forthcoming": forthcoming_bool,
+        "open": open_bool
+    }, doseq=True)
+
+    return RedirectResponse(url=f"/categories?{query_params}", status_code=303)
 
 @app.get("/categories")
-async def categories_page(request: Request):
+async def categories_page(
+    request: Request,
+    categories: List[str] = Query([]),
+    closed: bool = Query(False),
+    forthcoming: bool = Query(False),
+    open_: bool = Query(False, alias="open")
+):
     """
-    Load the category selection page with stored categories.
+    Load category selection page using query parameters.
     """
-    categories = request.session.get("categories", [])
-    closed = request.session.get("closed", False)
+    print("🟠 Categories from Query Params:", categories)
+    print(f"Filters - Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
 
-    return templates.TemplateResponse("options.html", {"request": request, "categories": categories, "closed": closed})
+    return templates.TemplateResponse("options.html", {
+        "request": request,
+        "categories": categories,
+        "closed": closed,
+        "forthcoming": forthcoming,
+        "open": open_
+    })
 
 @app.get("/loading")
 async def loading_page(request: Request, redirect_url: str):
@@ -87,7 +135,7 @@ async def loading_page(request: Request, redirect_url: str):
 
     #wait_interval = 3
 
-    if not os.path.exists(progress_flag):  # ✅ Only continue when flag is removed
+    if not os.path.exists(progress_flag):
         return RedirectResponse(url=redirect_url)
 
     #await asyncio.sleep(wait_interval)
@@ -107,14 +155,28 @@ async def scrape_endpoint(
     request: Request,
     background_tasks: BackgroundTasks,
     categories: List[str] = Form(...),
-    closed: bool = Form(False)
+    closed: bool = Form(...),
+    forthcoming: bool = Form(...),
+    open_: bool = Form(..., alias="open")
 ):
     """
-    Starts scraping for selected categories in the background.
+    Starts scraping for selected categories in the background with filtering options.
     """
-    background_tasks.add_task(scrape_eu_portal, closed_option=closed, desired_category=categories)
+    print("🟠 Scrape Endpoint Called")
+    print(f"Selected Categories: {categories}")
+    print(f"Filters - Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
+
+    # Start the scraper with the selected filters
+    background_tasks.add_task(
+        scrape_eu_portal,
+        closed_option=closed,
+        forthcoming_option=forthcoming,
+        open_option=open_,
+        desired_category=categories
+    )
 
     return RedirectResponse(url="/loading?redirect_url=/results", status_code=303)
+
 
 
 
@@ -139,6 +201,8 @@ async def get_results(request: Request):
 
     return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
+
+#TODO make the different sheets
 @app.get("/export-excel")
 async def export_excel():
     """

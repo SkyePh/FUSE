@@ -6,6 +6,11 @@
     <title>Options</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        function toggleSelectAll(source) {
+            let checkboxes = document.querySelectorAll("input[name='categories']");
+            checkboxes.forEach(checkbox => checkbox.checked = source.checked);
+        }
+
         function submitForm() {
             let form = document.getElementById("categoryForm");
             let selectedCategories = [];
@@ -26,18 +31,68 @@
             // Submit form
             form.submit();
         }
+
+        function sortCategories() {
+            let container = document.getElementById("categoriesContainer");
+
+            // Ensure container exists before proceeding
+            if (!container) {
+                console.error("Error: categoriesContainer not found!");
+                return;
+            }
+
+            let items = Array.from(container.children);
+
+            // Sort alphabetically
+            items.sort((a, b) => {
+                let textA = a.querySelector("span").innerText.toUpperCase();
+                let textB = b.querySelector("span").innerText.toUpperCase();
+                return textA.localeCompare(textB);
+            });
+
+            // Toggle sorting order (A-Z or Z-A)
+            if (container.dataset.sorted === "asc") {
+                items.reverse();
+                container.dataset.sorted = "desc";
+            } else {
+                container.dataset.sorted = "asc";
+            }
+
+            // Re-append sorted elements
+            container.innerHTML = "";
+            items.forEach(item => container.appendChild(item));
+        }
     </script>
 </head>
 <body class="bg-gray-100 p-6">
     <div class="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-lg">
         <h1 class="text-xl font-bold mb-4">Select Categories to Scrape</h1>
-        <form action="/scrape" method="post" class="space-y-4">
+
+        <form id="categoryForm" action="/scrape" method="post" class="space-y-4">
+            <div class="flex justify-between items-center mb-2">
+                <label class="flex items-center space-x-2 font-bold">
+                    <input type="checkbox" onclick="toggleSelectAll(this)" class="rounded text-blue-500">
+                    <span>Select All</span>
+                </label>
+                <button type="button" onclick="sortCategories()" class="bg-gray-300 px-3 py-1 rounded-md hover:bg-gray-400 ml-auto">
+                    Sort A-Z / Z-A
+                </button>
+            </div>
+
+            <div id="categoriesContainer" data-sorted="asc">
             {% for category in categories %}
             <label class="flex items-center space-x-2">
                 <input type="checkbox" name="categories" value="{{ category }}" class="rounded text-blue-500">
                 <span>{{ category }}</span>
             </label>
             {% endfor %}
+                </div>
+
+            <!-- Hidden fields to pass filter selections -->
+            <input type="hidden" name="closed" value="{{ closed }}">
+            <input type="hidden" name="forthcoming" value="{{ forthcoming }}">
+            <input type="hidden" name="open" value="{{ open }}">
+
             <button type="submit" onclick="submitForm()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 w-full">
                 Start Scraping
             </button>

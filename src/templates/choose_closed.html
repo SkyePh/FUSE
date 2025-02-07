@@ -6,19 +6,39 @@
     <title>Choose Call Type</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="flex items-center justify-center h-screen bg-gray-100">
-    <form action="/fetching_calls_loading" method="get" class="bg-white p-6 rounded-lg shadow-lg text-center">
-        <h2 class="text-2xl font-semibold text-gray-900">Include closed calls?</h2>
-        <p class="mt-2 text-gray-500">Would you like to include closed calls in your search?</p>
-
-        <div class="mt-4 flex justify-center space-x-4">
-            <button type="submit" name="closed" value="true" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
-                Yes
-            </button>
-            <button type="submit" name="closed" value="false" class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
-                No
-            </button>
+<body class="bg-gray-100">
+  <div class="max-w-xl mx-auto p-6 mt-10 bg-white rounded shadow">
+    <h1 class="text-2xl font-bold mb-4">Select Funding Status</h1>
+    <form action="/fetch-categories" method="POST">
+      <!-- Toggle Options -->
+      <div class="mb-6">
+        <div class="flex items-center mb-2">
+          <input type="checkbox" id="forthcoming" name="statuses" value="forthcoming" class="form-checkbox h-5 w-5 text-blue-600">
+          <label for="forthcoming" class="ml-2 text-gray-700">Forthcoming</label>
         </div>
+        <div class="flex items-center mb-2">
+          <input type="checkbox" id="open" name="statuses" value="open" class="form-checkbox h-5 w-5 text-blue-600">
+          <label for="open" class="ml-2 text-gray-700">Open</label>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox" id="closed" name="statuses" value="closed" class="form-checkbox h-5 w-5 text-blue-600">
+          <label for="closed" class="ml-2 text-gray-700">Closed</label>
+        </div>
+      </div>
+
+      <!-- Search Field -->
+      <div class="mb-6">
+        <label for="keyword" class="block text-gray-700 font-medium mb-2">Search Keyword</label>
+        <input type="text" id="keyword" name="keyword" placeholder="Enter keyword..." class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600">
+      </div>
+
+      <!-- Submit Button -->
+      <div>
+        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+          Submit
+        </button>
+      </div>
     </form>
+  </div>
 </body>
 </html>
