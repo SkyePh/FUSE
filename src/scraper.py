@@ -9,6 +9,8 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 import json
 
+#TODO fix the keyword searching
+
 # Save results in JSON format
 results_json_path = "scraped_results.json"
 
