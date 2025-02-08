@@ -20,17 +20,21 @@
                 <thead>
                     <tr class="bg-gray-200">
                         <th class="border border-gray-400 px-4 py-2">Identifier</th>
+                        <th class="border border-gray-400 px-4 py-2">Action</th>
                         <th class="border border-gray-400 px-4 py-2">Title</th>
                         <th class="border border-gray-400 px-4 py-2">Budget</th>
                         <th class="border border-gray-400 px-4 py-2">Deadline</th>
                         <th class="border border-gray-400 px-4 py-2">Funding Per Project</th>
                         <th class="border border-gray-400 px-4 py-2">Accepted Projects</th>
+                        <th class="border border-gray-400 px-4 py-2">Status</th>
+                        <th class="border border-gray-400 px-4 py-2">Probability Rate</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in data %}
                         <tr class="hover:bg-gray-100">
                             <td class="border border-gray-400 px-4 py-2">{{ row["Identifier"] }}</td>
+                            <td class="border border-gray-400 px-4 py-2">{{ row["Action"] }}</td>
                             <td class="border border-gray-400 px-4 py-2">
                                 <a href="{{ row['Link'] }}" target="_blank" class="text-blue-500 hover:underline">
                                     {{ row["Title"] }}
@@ -40,6 +44,14 @@
                             <td class="border border-gray-400 px-4 py-2">{{ row["Deadline"] }}</td>
                             <td class="border border-gray-400 px-4 py-2">{{ row["Funding Per Project"] }}</td>
                             <td class="border border-gray-400 px-4 py-2">{{ row["Accepted Projects"] }}</td>
+                            <td class="border border-gray-400 px-4 py-2">{{ row["Status"] }}</td>
+                            <td class="border border-gray-400 px-4 py-2
+                                {% if row['Accepted Projects']|int <= 2 %} bg-blue-300
+                                {% elif row['Accepted Projects']|int == 3 %} bg-yellow-300
+                                {% elif row['Accepted Projects']|int >= 4 %} bg-green-300
+                                {% endif %}">
+                                {{ row["Probability Rate"] }}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
