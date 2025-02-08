@@ -202,8 +202,6 @@ async def get_results(request: Request):
     return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
 
-#TODO make the different sheets
-
 def extract_group_name(identifier):
     """Extracts the category group from an identifier (e.g., 'HORIZON-CL5-D4' -> 'CL5')."""
     parts = identifier.split('-')
