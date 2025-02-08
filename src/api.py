@@ -42,8 +42,6 @@ async def home(request: Request):
     Step 1: Ask if the user wants closed calls.
     Step 2: Show loading page while fetching categories.
     """
-    # if closed is None:
-    #     return templates.TemplateResponse("choose_closed.html", {"request": request})
 
     return templates.TemplateResponse("home.html", {"request": request})
 
@@ -55,32 +53,26 @@ async def choose_closed(request: Request):
     return templates.TemplateResponse("choose_closed.html", {"request": request})
 
 
-
-# def parse_checkbox(value: Optional[str]) -> bool:
-#     """
-#     Convert the checkbox value to a boolean.
-#     - If the value is None (checkbox not submitted), return False.
-#     - If the value exists, return True.
-#     """
-#     return value is not None and value.lower() in ["on", "true", "1", "yes"]
-
-
 @app.post("/fetch-categories")
 async def fetch_categories(
     request: Request,
-    statuses: Optional[List[str]] = Form([]),
+    closed: str = Form("false"),
+    forthcoming: str = Form("false"),
+    open_: str = Form("false", alias="open"),
     keyword: Optional[str] = Form("")
 ):
     """
     Fetch categories and pass them directly to /categories via query parameters.
     """
 
-    # Convert checkbox statuses to booleans
-    closed_bool = "closed" in statuses
-    forthcoming_bool = "forthcoming" in statuses
-    open_bool = "open" in statuses
+    print(f"📥 Raw Data from Form Submission → Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
 
-    print(f"Closed: {closed_bool}, Forthcoming: {forthcoming_bool}, Open: {open_bool}")
+    # Convert "true"/"false" strings to actual booleans
+    closed_bool = closed.lower() == "true"
+    forthcoming_bool = forthcoming.lower() == "true"
+    open_bool = open_.lower() == "true"
+
+    print(f"✅ Converted Bools → Closed: {closed_bool}, Forthcoming: {forthcoming_bool}, Open: {open_bool}")
 
     # Fetch categories from scraper
     categories = await scrape_eu_portal(
@@ -93,15 +85,14 @@ async def fetch_categories(
 
     print("✅ Categories Retrieved from Scraper:", categories)
 
-    # Encode query parameters
-    query_params = urlencode({
+    return templates.TemplateResponse("options.html", {
+        "request": request,
         "categories": categories,
         "closed": closed_bool,
         "forthcoming": forthcoming_bool,
         "open": open_bool
-    }, doseq=True)
+    })
 
-    return RedirectResponse(url=f"/categories?{query_params}", status_code=303)
 
 @app.get("/categories")
 async def categories_page(
@@ -142,13 +133,6 @@ async def loading_page(request: Request, redirect_url: str):
 
     return templates.TemplateResponse("loading.html", {"request": request, "redirect_url": redirect_url})
 
-
-@app.get("/fetching_calls_loading")
-async def fetching_calls_loading(request: Request, closed: bool):
-    """
-    Show the loading screen AFTER selecting closed calls, then fetch categories.
-    """
-    return templates.TemplateResponse("loading_after_closed_choice.html", {"request": request, "redirect_url": f"/fetch-categories?closed={closed}"})
 
 @app.post("/scrape")
 async def scrape_endpoint(

@@ -5,23 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Choose Call Type</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Hide the loading screen initially */
+        #loadingScreen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 1);
+            z-index: 9999;
+            text-align: center;
+            padding-top: 20%;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
   <div class="max-w-xl mx-auto p-6 mt-10 bg-white rounded shadow">
     <h1 class="text-2xl font-bold mb-4">Select Funding Status</h1>
-    <form action="/fetch-categories" method="POST">
+
+    <form id="statusForm" action="/fetch-categories" method="POST">
       <!-- Toggle Options -->
       <div class="mb-6">
         <div class="flex items-center mb-2">
-          <input type="checkbox" id="forthcoming" name="statuses" value="forthcoming" class="form-checkbox h-5 w-5 text-blue-600">
+          <input type="hidden" name="forthcoming" value="false">
+          <input type="checkbox" id="forthcoming" name="forthcoming" value="true" class="form-checkbox h-5 w-5 text-blue-600">
           <label for="forthcoming" class="ml-2 text-gray-700">Forthcoming</label>
         </div>
         <div class="flex items-center mb-2">
-          <input type="checkbox" id="open" name="statuses" value="open" class="form-checkbox h-5 w-5 text-blue-600">
+          <input type="hidden" name="open" value="false">
+          <input type="checkbox" id="open" name="open" value="true" class="form-checkbox h-5 w-5 text-blue-600">
           <label for="open" class="ml-2 text-gray-700">Open</label>
         </div>
         <div class="flex items-center">
-          <input type="checkbox" id="closed" name="statuses" value="closed" class="form-checkbox h-5 w-5 text-blue-600">
+          <input type="hidden" name="closed" value="false">
+          <input type="checkbox" id="closed" name="closed" value="true" class="form-checkbox h-5 w-5 text-blue-600">
           <label for="closed" class="ml-2 text-gray-700">Closed</label>
         </div>
       </div>
@@ -34,11 +56,24 @@
 
       <!-- Submit Button -->
       <div>
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+        <button type="submit" id="submitButton" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
           Submit
         </button>
       </div>
     </form>
   </div>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen">
+      <div class="animate-spin h-16 w-16 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+      <p>Loading, please wait...</p>
+  </div>
+
+  <script>
+    document.getElementById("statusForm").addEventListener("submit", function() {
+        // Show loading screen
+        document.getElementById("loadingScreen").style.display = "block";
+    });
+  </script>
 </body>
 </html>
