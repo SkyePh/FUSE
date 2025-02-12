@@ -66,187 +66,6 @@ async def status_click(page, status_dict, selected_statuses, all_filters_selecto
 
 
 
-async def scrape_calls_when_keyword(page, browser):
-
-    next_button_selector = 'button:has(eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"])'
-    next_icon_selector = 'eui-icon-svg[icon="eui-caret-right"][aria-label="Go to next page"]'
-
-    # Initialize data containers
-    titles_data = []
-    table_data = []
-
-    while True:
-
-        # Wait for results to load
-        await page.wait_for_selector("sedia-result-card")
-
-        # Extract the HTML content
-        html = await page.content()
-        soup = BeautifulSoup(html, "html.parser")
-
-        # Extract results on the current page
-        call_items = soup.select("sedia-result-card")
-
-        for item in call_items:
-            # Extract title (name)
-            title_element = item.select_one("a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
-            title = title_element.text.strip() if title_element else "No title"
-
-            # Extract identifier
-            identifier_element = item.select_one("sedia-result-card-type span.ng-star-inserted")
-            identifier = identifier_element.text.strip() if identifier_element else "No identifier"
-
-            # Extract status
-            status_element = item.select_one("eui-card-header-right-content eui-chip span.eui-label")
-            status = status_element.text.strip() if status_element else "No status found"
-
-            # Extract href link
-            href = title_element['href'] if title_element and title_element.has_attr('href') else "No link"
-
-            # Append to titles_data
-            titles_data.append(
-                {"Identifier": identifier, "Title": title, "Status": status, "Link": "https://ec.europa.eu" + href})
-
-        # Open the first card to extract table data or fallback to "Total funding available"
-        if len(table_data) == 0:  # Only fetch data from the first card
-            first_call_link_element = call_items[0].select_one(
-                "a.eui-u-text-link.eui-u-font-l.eui-u-font-regular")
-            first_call_link = first_call_link_element['href'] if first_call_link_element else None
-
-            if first_call_link:
-                # Open a new tab for the first call details page
-                new_tab = await browser.new_page()
-                await new_tab.goto(f"https://ec.europa.eu{first_call_link}")
-                print(f"Opened first call link in a new tab: {first_call_link}")
-
-                try:
-                    # Wait for the table inside the card
-                    await new_tab.wait_for_selector('table.eui-table', timeout=30000)
-
-                    # Extract table data
-                    html = await new_tab.content()
-                    soup = BeautifulSoup(html, "html.parser")
-                    rows = soup.select('table.eui-table tbody tr')
-
-                    identifier_to_action = {}
-
-                    for row in rows:
-                        # Extract identifier and truncate at the first whitespace
-                        identifier_element = row.select_one('td:nth-child(1)')
-                        raw_identifier = identifier_element.text.strip()
-                        identifier = raw_identifier.split(" ")[0] if raw_identifier else "No identifier"
-
-                        # Extract the action type (e.g., RIA, IA)
-                        action_match = re.search(r'-(RIA|IA|CSA|MSCA|EIC)', raw_identifier)
-                        action_type = action_match.group(1) if action_match else "No action"
-
-                        # Add to the temporary dictionary
-                        identifier_to_action[identifier] = action_type
-
-                        # Extract budget
-                        raw_budget = row.select_one('td:nth-child(2)').text.strip()
-                        budget = raw_budget.replace(" ", "").rstrip(".")
-
-                        # Extract deadline
-                        deadline = row.select_one('td:nth-child(5)').text.strip()
-                        formatted_deadline = format_date(deadline)
-
-                        # Extract funding per submission
-                        funding_element = row.select_one('td:nth-child(6)')
-                        raw_funding = funding_element.text.strip() if funding_element else "No funding info"
-                        if "to" in raw_funding:
-                            min_funding, max_funding = map(lambda x: x.replace(" ", ""),
-                                                           raw_funding.split("to"))
-                            funding_per_submission = f"Min: {min_funding} Max: {max_funding}"
-                        elif "around" in raw_funding:
-                            funding_per_submission = f"~ {raw_funding.replace('around', '').strip()}"
-                        else:
-                            funding_per_submission = raw_funding
-
-                        # Extract accepted submissions
-                        accepted_submissions = row.select_one('td:nth-child(7)').text.strip()
-
-                        # Append to table_data
-                        table_data.append({
-                            "Identifier": identifier,
-                            "Intensity Rate": "Coming soon",
-                            "Budget": budget,
-                            "Deadline": formatted_deadline,
-                            "Funding Per Project": funding_per_submission,
-                            "Accepted Projects": accepted_submissions
-                        })
-
-                    # Merge the Action Type into titles_data using the Identifier as the key
-                    for item in titles_data:
-                        item["Action"] = identifier_to_action.get(item["Identifier"], "No action")
-
-                except Exception as e:
-                    print("Table not found, attempting fallback to 'Total funding available'")
-                    # Attempt to locate the budget in "Total funding available"
-                    try:
-                        funding_container = new_tab.locator(
-                            'div.eui-input-group:has(div:has-text("Total funding available"))')
-                        budget_element = funding_container.locator('div.eui-u-font-m')
-                        if await budget_element.count() > 0:
-                            raw_budget = (await budget_element.first.text_content()).strip()
-                            budget = raw_budget.replace("\u202f", "").replace(",", "").replace("€",
-                                                                                               "").strip()
-                            table_data.append({
-                                "Identifier": "No identifier found",
-                                "Intensity Rate": "Coming soon",
-                                "Budget": budget,
-                                "Deadline": "No deadline found",
-                                "Funding Per Project": "No funding info",
-                                "Accepted Projects": "No submission info"
-                            })
-                            print(f"Extracted Budget from fallback: {budget}")
-                        else:
-                            print("No budget found in fallback.")
-                    except Exception as fallback_error:
-                        print(f"Error during fallback extraction: {fallback_error}")
-
-                finally:
-                    # Close the new tab after extraction
-                    await new_tab.close()
-
-        await page.wait_for_selector(next_button_selector)
-        # Locate the "Next" button
-        next_button = page.locator(next_button_selector)
-        # Debugging output
-        print("Checking Next button state...")
-        if await next_button.count() > 0:
-            # Check if the button is disabled
-            is_disabled = await next_button.evaluate("(button) => button.disabled")
-            print(f"Is Next button disabled: {is_disabled}")
-
-            if is_disabled:
-                print("Next button is disabled. Exiting pagination.")
-                break
-        else:
-            print("Next button not found. Exiting pagination.")
-            break
-
-        # Wait for the eui-icon-svg element to appear
-        await page.wait_for_selector(next_icon_selector, timeout=20000)
-
-        # Locate the icon
-        next_icon = page.locator(next_icon_selector)
-
-        # Debugging output
-        print("Next icon count:", next_icon.count())
-        print("Next icon visible:", next_icon.is_visible())
-
-        # Click the icon if available
-        if await next_icon.count() > 0 and await next_icon.is_visible():
-            await next_icon.click()
-            print("Clicked the 'Next' icon.")
-            print("waiting for 30 sec to load next page")
-            await asyncio.sleep(30)
-
-        else:
-            print("Next icon not found or not visible. Exiting pagination.")
-            break
-
 def extract_group_name(filename):
     """Extract the desired part of the filename (e.g., CL4 from HORIZON-CL4-D3-2024)."""
     parts = filename.split('-')
@@ -395,20 +214,20 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
         # await page.wait_for_selector(status_button)
         # await page.click(status_button)
 
-        # --- Keyword Filtering ---
-        if keyword:
-            # Replace the selector with the actual search field's selector on the portal
-            search_selector = "span.eui-autocomplete__field-wrapper input[euiinputtext]"  # Placeholder selector
-            search_click = 'button:has(eui-icon-svg[icon="eui-ecl-search"]'
-            try:
-                await page.wait_for_selector(search_selector, timeout=5000)
-                await page.fill(search_selector, keyword)
-                await page.click(search_selector)
-                print("Keyword filter applied:", keyword)
-
-                await scrape_calls_when_keyword(page, browser)
-            except Exception as e:
-                print("Search field not found or error:", e)
+        # # --- Keyword Filtering ---
+        # if keyword:
+        #     # Replace the selector with the actual search field's selector on the portal
+        #     search_selector = "span.eui-autocomplete__field-wrapper input[euiinputtext]"  # Placeholder selector
+        #     search_click = 'button:has(eui-icon-svg[icon="eui-ecl-search"]'
+        #     try:
+        #         await page.wait_for_selector(search_selector, timeout=5000)
+        #         await page.fill(search_selector, keyword)
+        #         await page.click(search_selector)
+        #         print("Keyword filter applied:", keyword)
+        #
+        #         await scrape_calls_when_keyword(page, browser)
+        #     except Exception as e:
+        #         print("Search field not found or error:", e)
 
         # Press the Call button
         submission_status_button_selector = "button.eui-button:has-text('Call')"
