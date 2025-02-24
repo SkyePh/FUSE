@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Form, BackgroundTasks, Query
 from fastapi.responses import RedirectResponse, FileResponse
+from contextlib import asynccontextmanager
 from typing import List, Optional
 import pandas as pd
 from openpyxl import load_workbook
@@ -13,6 +14,7 @@ import sys
 import os
 from urllib.parse import urlencode
 import json
+from database import fetch_all_calls
 
 # Windows-specific fix for Playwright subprocess execution
 if sys.platform == "win32":
