@@ -611,7 +611,7 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                         "deadline_primary": deadline_primary,  # e.g., "2021-10-06" or "06 OCT 2024"
                         "deadline_secondary": deadline_secondary,  # e.g., "14 APR 2024" or None
                         "opening_date": row.get("Opening Date"),
-                        "accepted_projects": int(row.get("Accepted Projects")),
+                        "accepted_projects": row.get("Accepted Projects"),
                         "probability_rate": row.get("Probability Rate"),
                         "link": row.get("Link")
                     }
