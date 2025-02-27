@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # Replace with your actual PostgreSQL connection URL or set DATABASE_URL in your environment.
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:[password]@localhost:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:bruhm0m3nt&@localhost:5432/postgres")
 
 # Global connection pool variable
 pool: asyncpg.Pool = None

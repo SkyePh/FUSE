@@ -421,7 +421,8 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                             deadline_index = headers.index("Deadline") + 1
                             open_date_index = headers.index("Opening date") + 1
                             funding_per_sub_index = headers.index("Contributions") + 1
-                            budget_index = headers.index("Stages")
+                            budget_index_first = 2
+                            budget_index_last = headers.index("Stages")
 
 
 
@@ -453,8 +454,16 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                                 identifier_to_action[identifier] = action_type
 
                                 # Extract budget
-                                raw_budget = row.select_one(f'td:nth-child({budget_index})').text.strip()
+                                raw_budget = row.select_one(f'td:nth-child({budget_index_first})').text.strip()
                                 budget = raw_budget.replace(" ", "").rstrip(".")
+
+                                # Iterate over the remaining budget columns until we hit "Stages".
+                                for i in range(budget_index_first + 1, budget_index_last):
+                                    cell = row.select_one(f'td:nth-child({i})')
+                                    if cell:
+                                        value = cell.text.strip()
+                                        if value != "":  # update only if non-empty
+                                            budget = value.replace(" ", "").rstrip(".")
 
                                 print('bruh4')
                                 # Extract deadline
