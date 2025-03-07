@@ -8,7 +8,7 @@ from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 import json
-from database import store_call
+from database import store_call, store_category, get_category_id
 
 #TODO fix the keyword searching
 
@@ -262,6 +262,9 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
 
         # Print all extracted options
         print("Extracted Options:", options)
+
+        for category in options:
+            await store_category(category)
 
         #==================================== get input =========================================
 
@@ -611,6 +614,9 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                     except ValueError:
                         accepted_projects = 0
 
+                    category_name = options[counter_for_menu]
+                    category_id = await get_category_id(category_name)
+
                     record = {
                         "identifier": row.get("Identifier"),
                         "title": row.get("Title"),
@@ -622,7 +628,8 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                         "opening_date": row.get("Opening Date"),
                         "accepted_projects": row.get("Accepted Projects"),
                         "probability_rate": row.get("Probability Rate"),
-                        "link": row.get("Link")
+                        "link": row.get("Link"),
+                        "category_id": category_id
                     }
                     await store_call(record)
 
@@ -654,4 +661,3 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
         os.remove("scraping_in_progress.json")
         # Close the browser
         await browser.close()
-

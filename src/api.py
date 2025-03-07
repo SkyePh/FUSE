@@ -267,4 +267,4 @@ async def export_excel():
     return FileResponse(output_excel_path, filename="scraped_results.xlsx",
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# Run with: uvicorn api:app (DONT USE --reload)
+# Run with: uvicorn api:app --host 127.0.0.1 --port 5000 (DONT USE --reload)
