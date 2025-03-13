@@ -6,124 +6,143 @@
     <title>Scraping Results</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        let activeFilter = ""; // Store currently active filter column
+        function applyFilters() {
+          // Get the filter values (all lower-case for uniformity)
+          const status = document.getElementById('status-filter').value.toLowerCase();
+          const probability = document.getElementById('probability-filter').value.toLowerCase();
+          const keyword = document.getElementById('keyword-filter').value.toLowerCase();
 
-        function filterResults(column) {
-            let selectedValue = document.getElementById(column + "-filter").value;
-            let rows = document.querySelectorAll("tbody tr");
+          // Get all rows in the table body
+          const rows = document.querySelectorAll("tbody tr");
 
-            // Clear any previous active filter if a new one is selected
-            if (activeFilter && activeFilter !== column) {
-                document.getElementById(activeFilter + "-filter").value = "all"; // Reset previous filter
+          rows.forEach(row => {
+            // Assuming your table rows include these data attributes in appropriate cells.
+            // Adjust selectors as needed based on your actual template structure.
+            let statusCell = row.querySelector("[data-column='Status']");
+            let probabilityCell = row.querySelector("[data-column='Probability Rate']");
+            // For keyword search, we check the Title (which is inside an <a> tag) or you could search the whole row text.
+            let titleCell = row.querySelector("td a");
+
+            let rowStatus = statusCell ? statusCell.innerText.trim().toLowerCase() : "";
+            let rowProbability = probabilityCell ? probabilityCell.innerText.trim().toLowerCase() : "";
+            let rowTitle = titleCell ? titleCell.innerText.trim().toLowerCase() : row.innerText.toLowerCase();
+
+            // Determine if row should be shown:
+            let show = true;
+            if (status !== "all" && rowStatus !== status) {
+              show = false;
             }
-            activeFilter = column; // Update active filter
-
-            rows.forEach(row => {
-                let cell = row.querySelector(`[data-column='${column}']`);
-                if (selectedValue === "all" || cell.innerText.trim() === selectedValue) {
-                    row.style.display = ""; // Show row
-                } else {
-                    row.style.display = "none"; // Hide row
-                }
-            });
+            if (probability !== "all" && rowProbability !== probability) {
+              show = false;
+            }
+            if (keyword && !rowTitle.includes(keyword)) {
+              show = false;
+            }
+            row.style.display = show ? "" : "none";
+          });
         }
     </script>
+
 </head>
 <body class="bg-gray-100 text-gray-900">
-    <div class="container mx-auto p-6">
-        <!-- Move H1 Above Filters -->
-        <h1 class="text-3xl font-bold mb-4">Scraped Results</h1>
+  <div class="container mx-auto p-6">
 
-
-        <!-- Filters and Export Button in One Row -->
-        <div class="flex justify-between items-center mb-4">
-            <!-- Filters Section -->
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="block font-bold">Filter by Status</label>
-                    <select id="Status-filter" class="border p-2 w-full" onchange="filterResults('Status')">
-                        <option value="all">All</option>
-                        {% for status in data | map(attribute='Status') | unique %}
-                        <option value="{{ status }}">{{ status }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-bold">Filter by Action</label>
-                    <select id="Action-filter" class="border p-2 w-full" onchange="filterResults('Action')">
-                        <option value="all">All</option>
-                        {% for action in data | map(attribute='Action') | unique %}
-                        <option value="{{ action }}">{{ action }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-bold">Filter by Probability Rate</label>
-                    <select id="Probability Rate-filter" class="border p-2 w-full" onchange="filterResults('Probability Rate')">
-                        <option value="all">All</option>
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Export to Excel Button -->
-            <a href="/export-excel" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded h-fit">
-                Export to Excel
-            </a>
-        </div>
-
-        <!-- Results Table -->
-        {% if data %}
-        <table class="table-auto w-full border-collapse border border-gray-400 bg-white">
-            <thead>
-                <tr class="bg-gray-200">
-                    <th class="border border-gray-400 px-4 py-2">Identifier</th>
-                    <th class="border border-gray-400 px-4 py-2">Action</th>
-                    <th class="border border-gray-400 px-4 py-2">Title</th>
-                    <th class="border border-gray-400 px-4 py-2">Budget</th>
-                    <th class="border border-gray-400 px-4 py-2">Opening Date</th>
-                    <th class="border border-gray-400 px-4 py-2">Deadline</th>
-                    <th class="border border-gray-400 px-4 py-2">Accepted Projects</th>
-                    <th class="border border-gray-400 px-4 py-2">Funding Per Project</th>
-                    <th class="border border-gray-400 px-4 py-2">Status</th>
-                    <th class="border border-gray-400 px-4 py-2">Probability Rate</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in data %}
-                <tr class="hover:bg-gray-100">
-                    <td class="border border-gray-400 px-4 py-2">{{ row["Identifier"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2" data-column="Action">{{ row["Action"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2">
-                        <a href="{{ row['Link'] }}" target="_blank" class="text-blue-500 hover:underline">
-                            {{ row["Title"] }}
-                        </a>
-                    </td>
-                    <td class="border border-gray-400 px-4 py-2">{{ row["Budget"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2" data-column="Opening Date">{{ row["Opening Date"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2" data-column="Deadline">{{ row["Deadline"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2">{{ row["Accepted Projects"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2">{{ row["Funding Per Project"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2" data-column="Status">{{ row["Status"] }}</td>
-                    <td class="border border-gray-400 px-4 py-2
-                        {% if row['Probability Rate'] == 'Low' %} bg-blue-200
-                        {% elif row['Probability Rate'] == 'Medium' %} bg-yellow-200
-                        {% elif row['Probability Rate'] == 'High' %} bg-green-200
-                        {% endif %}"
-                        data-column="Probability Rate">
-                        {{ row["Probability Rate"] }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="text-red-500">No results found. Please start a new scrape.</p>
-        {% endif %}
-
-        <a href="/" class="block mt-4 text-blue-500 hover:underline">Back to Home</a>
+    <!-- Unified Filter Area -->
+    <div class="flex gap-4 mb-4">
+      <div>
+        <label class="block font-bold">Status:</label>
+        <select id="status-filter" class="border p-2" onchange="applyFilters()">
+          <option value="all">All</option>
+          <option value="open">Open For Submission</option>
+          <option value="forthcoming">Forthcoming</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-bold">Probability Rate:</label>
+        <select id="probability-filter" class="border p-2" onchange="applyFilters()">
+          <option value="all">All</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-bold">Keyword:</label>
+        <!-- Wrap keyword input and button in a form that submits to the search endpoint -->
+        <form action="/search" method="get" class="flex gap-2">
+          <input type="text" id="keyword-filter" name="keyword" class="border p-2" placeholder="Enter keyword...">
+          <button type="submit" class="bg-blue-500 text-white rounded px-4 py-1 hover:bg-blue-600">Search</button>
+        </form>
+      </div>
     </div>
+
+    <!-- Export to Excel Button -->
+    <div class="flex justify-end mb-4">
+      <a href="/export-excel" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+        Export to Excel
+      </a>
+    </div>
+
+    <!-- Results Table -->
+    {% if data %}
+    <div class="overflow-x-auto border border-black" style="max-width: 100%; margin-left: 0;">
+        <table class="table-auto w-full border-collapse border border-gray-400 bg-white">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border border-gray-400 px-4 py-2">Identifier</th>
+              <th class="border border-gray-400 px-4 py-2">Category</th>
+              <th class="border border-gray-400 px-4 py-2">Action</th>
+              <th class="border border-gray-400 px-4 py-2">Title</th>
+              <th class="border border-gray-400 px-4 py-2">Budget</th>
+              <th class="border border-gray-400 px-4 py-2">Opening Date</th>
+              <th class="border border-gray-400 px-4 py-2">Primary Deadline</th>
+              <th class="border border-gray-400 px-4 py-2">Secondary Deadline</th>
+              <th class="border border-gray-400 px-4 py-2">Accepted Projects</th>
+              <th class="border border-gray-400 px-4 py-2">Funding Per Project</th>
+              <th class="border border-gray-400 px-4 py-2" data-column="Status">Status</th>
+              <th class="border border-gray-400 px-4 py-2" data-column="Probability Rate">Probability Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in data %}
+            <tr class="hover:bg-gray-100">
+              <td class="border border-gray-400 px-4 py-2">{{ row["identifier"] }}</td>
+              <td class="border border-gray-400 px-4 py-2">{{ row["category_id"] }}</td>
+              <td class="border border-gray-400 px-4 py-2" data-column="Action">{{ row["action_type"] }}</td>
+              <td class="border border-gray-400 px-4 py-2">
+                <a href="{{ row['link'] }}" target="_blank" class="text-blue-500 hover:underline">
+                  {{ row["title"] }}
+                </a>
+              </td>
+              <td class="border border-gray-400 px-4 py-2">{{ row["budget"] }}</td>
+              <td class="border border-gray-400 px-4 py-2" data-column="Opening Date">{{ row["opening_date"] }}</td>
+              <td class="border border-gray-400 px-4 py-2" data-column="Primary Deadline">{{ row["deadline_primary"] }}</td>
+              <td class="border border-gray-400 px-4 py-2" data-column="Secondary Deadline">{{ row["deadline_secondary"] }}</td>
+              <td class="border border-gray-400 px-4 py-2">{{ row["accepted_projects"] }}</td>
+              <td class="border border-gray-400 px-4 py-2">{{ row["funding_per_project"] }}</td>
+              <td class="border border-gray-400 px-4 py-2" data-column="Status">{{ row["status"] if row.get("status") else "" }}</td>
+              <td class="border border-gray-400 px-4 py-2" data-column="Probability Rate"
+                  {% if row['probability_rate']|lower == 'low' %}
+                      style="background-color: #ADD8E6;"
+                  {% elif row['probability_rate']|lower == 'medium' %}
+                      style="background-color: #FFFF00;"
+                  {% elif row['probability_rate']|lower == 'high' %}
+                      style="background-color: #90EE90;"
+                  {% endif %}>
+                  {{ row["probability_rate"] }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-red-500">No results found. Please start a new scrape.</p>
+    {% endif %}
+
+    <a href="/" class="block mt-4 text-blue-500 hover:underline">Back to Home</a>
+  </div>
 </body>
+<script src="../static/js/pagination.js"></script>
 </html>

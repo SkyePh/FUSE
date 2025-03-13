@@ -609,13 +609,18 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                         print(f"Skipping record due to incomplete primary deadline: '{raw_deadline}'")
                         continue
 
+                    #print(title)
+
                     try:
                         accepted_projects = int(row.get("Accepted Projects", 0))
                     except ValueError:
                         accepted_projects = 0
 
-                    category_name = options[counter_for_menu]
+                    category_name = selected_categories[counter_for_menu]
                     category_id = await get_category_id(category_name)
+
+                    # print(category_name)
+                    # print(category_id)
 
                     record = {
                         "identifier": row.get("Identifier"),
@@ -629,9 +634,15 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                         "accepted_projects": row.get("Accepted Projects"),
                         "probability_rate": row.get("Probability Rate"),
                         "link": row.get("Link"),
-                        "category_id": category_id
+                        "category_id": category_id,
+                        "status": status
                     }
-                    await store_call(record)
+
+                    # print (record)
+                    try:
+                        await store_call(record)
+                    except Exception as store_error:
+                        print(f"Error during record extraction: {store_error}")
 
                 # # --- JSON Saving Logic ---
                 # results_json_path = "scraped_results.json"

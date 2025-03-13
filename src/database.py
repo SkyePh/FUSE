@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # Replace with your actual PostgreSQL connection URL or set DATABASE_URL in your environment.
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:bruhm0m3nt&@localhost:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/postgres")
 
 # Global connection pool variable
 pool: asyncpg.Pool = None
@@ -22,6 +22,13 @@ async def get_category_id(category_name: str) -> int:
             return row["id"]
         else:
             raise Exception(f"Category '{category_name}' not found.")
+
+async def fetch_calls_by_keyword(keyword: str) -> list:
+    pool_obj = await get_pool()
+    async with pool_obj.acquire() as conn:
+        # Use ILIKE for case-insensitive matching in PostgreSQL.
+        rows = await conn.fetch("SELECT * FROM scraped_calls WHERE title ILIKE '%' || $1 || '%'", keyword)
+        return [dict(row) for row in rows]
 
 
 async def store_category(name: str, description: str = "No Description") -> int:
@@ -52,7 +59,7 @@ async def store_call(data: dict):
     Expected keys:
       - identifier, title, action_type, budget, funding_per_project,
         deadline_primary, deadline_secondary, opening_date,
-        accepted_projects, probability_rate, link, category_id
+        accepted_projects, probability_rate, link, category_id, status
     """
     # We assume deadlines and opening_date are already stored as text.
     pool = await get_pool()
@@ -61,9 +68,9 @@ async def store_call(data: dict):
             INSERT INTO scraped_calls (
                 identifier, title, action_type, budget, funding_per_project,
                 deadline_primary, deadline_secondary, opening_date,
-                accepted_projects, probability_rate, link, category_id
+                accepted_projects, probability_rate, link, category_id, status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (identifier) DO UPDATE
             SET 
                 title = EXCLUDED.title,
@@ -76,7 +83,8 @@ async def store_call(data: dict):
                 accepted_projects = EXCLUDED.accepted_projects,
                 probability_rate = EXCLUDED.probability_rate,
                 link = EXCLUDED.link,
-                category_id = EXCLUDED.category_id
+                category_id = EXCLUDED.category_id,
+                status = EXCLUDED.status
         """,
         data.get("identifier"),
         data.get("title"),
@@ -89,7 +97,8 @@ async def store_call(data: dict):
         data.get("accepted_projects"),
         data.get("probability_rate"),
         data.get("link"),
-        data.get("category_id")
+        data.get("category_id"),
+        data.get("status")
         )
 
 
@@ -107,9 +116,7 @@ async def fetch_all_categories():
 async def fetch_all_calls():
     pool_obj = await get_pool()
     async with pool_obj.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT * FROM scraped_calls")
-            rows = await cur.fetchall()
-            columns = [desc[0] for desc in cur.description]
-            return [dict(zip(columns, row)) for row in rows]
+        rows = await conn.fetch("SELECT * FROM scraped_calls")
+        return [dict(row) for row in rows]
+
 

@@ -14,7 +14,9 @@ import sys
 import os
 from urllib.parse import urlencode
 import json
-from database import fetch_all_calls
+from database import fetch_all_calls, fetch_calls_by_keyword
+
+
 
 # Windows-specific fix for Playwright subprocess execution
 if sys.platform == "win32":
@@ -171,22 +173,23 @@ async def get_results(request: Request):
     """
     Fetches the scraped results and displays them in an HTML page.
     """
-    results_json_path = "scraped_results.json"
-    progress_flag = "scraping_in_progress.json"
+    # results_json_path = "scraped_results.json"
+    # progress_flag = "scraping_in_progress.json"
+    #
+    # if os.path.exists(progress_flag):
+    #     return templates.TemplateResponse("loading.html",
+    #                                       {"request": request, "message": "Scraping still in progress..."})
 
-    if os.path.exists(progress_flag):
-        return templates.TemplateResponse("loading.html",
-                                          {"request": request, "message": "Scraping still in progress..."})
-
-    # Read the JSON file
-    try:
-        with open(results_json_path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-    except FileNotFoundError:
-        data = []  # Return empty list if no results found
+    data = await fetch_all_calls()
 
     return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
+@app.get("/search")
+async def search_calls_endpoint(request: Request, keyword: str):
+    # Query the database for calls matching the provided keyword
+    data = await fetch_calls_by_keyword(keyword)
+    # Return the results using the same template
+    return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
 def extract_group_name(identifier):
     """Extracts the category group from an identifier (e.g., 'HORIZON-CL5-D4' -> 'CL5')."""
