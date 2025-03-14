@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Form, BackgroundTasks, Query
 from fastapi.responses import RedirectResponse, FileResponse
+from contextlib import asynccontextmanager
 from typing import List, Optional
 import pandas as pd
 from openpyxl import load_workbook
@@ -8,11 +9,13 @@ import asyncio
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import HTMLResponse
 from scraper import scrape_eu_portal
 import sys
 import os
 from urllib.parse import urlencode
 import json
+from database import fetch_all_calls, fetch_calls_by_filters, get_pool
 
 # Windows-specific fix for Playwright subprocess execution
 if sys.platform == "win32":
@@ -169,22 +172,26 @@ async def get_results(request: Request):
     """
     Fetches the scraped results and displays them in an HTML page.
     """
-    results_json_path = "scraped_results.json"
-    progress_flag = "scraping_in_progress.json"
+    # results_json_path = "scraped_results.json"
+    # progress_flag = "scraping_in_progress.json"
+    #
+    # if os.path.exists(progress_flag):
+    #     return templates.TemplateResponse("loading.html",
+    #                                       {"request": request, "message": "Scraping still in progress..."})
 
-    if os.path.exists(progress_flag):
-        return templates.TemplateResponse("loading.html",
-                                          {"request": request, "message": "Scraping still in progress..."})
-
-    # Read the JSON file
-    try:
-        with open(results_json_path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-    except FileNotFoundError:
-        data = []  # Return empty list if no results found
+    data = await fetch_all_calls()
 
     return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
+@app.get("/search", response_class=HTMLResponse)
+async def search_calls(
+    request: Request,
+    keyword: str = "",
+    status: str = "all",
+    probability: str = "all"
+):
+    data = await fetch_calls_by_filters(keyword, status, probability)
+    return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
 def extract_group_name(identifier):
     """Extracts the category group from an identifier (e.g., 'HORIZON-CL5-D4' -> 'CL5')."""
@@ -198,71 +205,91 @@ def extract_group_name(identifier):
 
 
 @app.get("/export-excel")
-async def export_excel():
+async def export_excel(
+    keyword: str = "",
+    statuses: str = "",  # comma-separated statuses, e.g., "open,closed"
+    probability: str = "all"
+):
     """
-    Generate an Excel file from the scraped results and provide it for download.
+    Generate an Excel file from the filtered results in the DB and provide it for download.
+    The filters (keyword, statuses, probability) should match those currently used on-screen.
     """
-    results_json_path = "scraped_results.json"
     output_excel_path = "scraped_results.xlsx"
 
-    # Read JSON file
-    if not os.path.exists(results_json_path):
-        return {"error": "No scraped data available"}
+    # Build a dynamic SQL query based on the filters.
+    pool_obj = await get_pool()
+    async with pool_obj.acquire() as conn:
+        query = "SELECT * FROM scraped_calls WHERE 1=1"
+        params = []
+        param_index = 1
 
-    with open(results_json_path, "r", encoding="utf-8") as file:
-        try:
-            data = json.load(file)
-        except json.JSONDecodeError:
-            return {"error": "Invalid JSON data"}
+        if keyword:
+            query += f" AND title ILIKE '%' || ${param_index} || '%'"
+            params.append(keyword)
+            param_index += 1
+
+        # If statuses are provided (as a comma-separated string), filter on them.
+        if statuses:
+            # Convert comma-separated string into a list (and normalize to lower-case)
+            status_list = [s.strip().lower() for s in statuses.split(",") if s.strip()]
+            # Use the PostgreSQL ANY operator
+            query += f" AND lower(status) = ANY(${param_index})"
+            params.append(status_list)
+            param_index += 1
+
+        # If probability is provided and not "all", add that filter.
+        if probability and probability.lower() != "all":
+            query += f" AND lower(probability_rate) = ${param_index}"
+            params.append(probability.lower())
+            param_index += 1
+
+        # Execute the query.
+        rows = await conn.fetch(query, *params)
+        data = [dict(row) for row in rows]
 
     if not data:
         return {"error": "No data found"}
 
-    # Group results by category
+    # Group results by category.
     grouped_data = {}
-
     for entry in data:
-        identifier = entry.get("Identifier", "Unknown")
+        # Use your existing function to extract the group name from the identifier.
+        identifier = entry.get("identifier", "Unknown")
         category_group = extract_group_name(identifier)
-
         if category_group not in grouped_data:
             grouped_data[category_group] = []
-
         grouped_data[category_group].append(entry)
 
-    # Write data to an Excel file with separate sheets
+    # Write grouped data to an Excel file with separate sheets.
     with pd.ExcelWriter(output_excel_path) as writer:
         for category, entries in grouped_data.items():
             df = pd.DataFrame(entries)
-            df.to_excel(writer, sheet_name=category, index=False)
+            # Limit sheet name length if needed.
+            sheet_name = category[:31]
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    # Apply color formatting to the "Probability Rate" column
+    # Apply color formatting to the "Probability Rate" column.
     wb = load_workbook(output_excel_path)
-
     for sheet_name in wb.sheetnames:
         sheet = wb[sheet_name]
-        headers = [cell.value for cell in sheet[1]]  # First row as headers
-
+        headers = [cell.value for cell in sheet[1]]  # first row as headers
         if "Probability Rate" in headers:
-            probability_col_index = headers.index("Probability Rate") + 1  # Convert to 1-based index
-
-            # Apply color formatting based on probability rate values
-            for row in range(2, sheet.max_row + 1):  # Skip header row
+            probability_col_index = headers.index("Probability Rate") + 1  # 1-based index
+            for row in range(2, sheet.max_row + 1):
                 cell = sheet.cell(row=row, column=probability_col_index)
                 if cell.value == "Low":
-                    cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")  # Light blue
+                    cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
                 elif cell.value == "Medium":
-                    cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
+                    cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
                 elif cell.value == "High":
-                    cell.fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")  # Green
-
-    # Save the workbook with formatting applied
+                    cell.fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
     wb.save(output_excel_path)
-
     print(f"✅ Excel file created successfully: {output_excel_path}")
 
-    # Return the Excel file as a response for download
-    return FileResponse(output_excel_path, filename="scraped_results.xlsx",
-                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return FileResponse(
+        output_excel_path,
+        filename="scraped_results.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
-# Run with: uvicorn api:app (DONT USE --reload)
+# Run with: uvicorn api:app --host 127.0.0.1 --port 5000 (DONT USE --reload)

@@ -5,6 +5,7 @@ openpyxl
 uvicorn
 fastapi
 asyncio
+asyncpg
 pydantic
 jinja2
 python-multipart
