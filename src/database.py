@@ -23,11 +23,26 @@ async def get_category_id(category_name: str) -> int:
         else:
             raise Exception(f"Category '{category_name}' not found.")
 
-async def fetch_calls_by_keyword(keyword: str) -> list:
+
+async def fetch_calls_by_filters(keyword: str = "", status: str = "all", probability: str = "all") -> list:
     pool_obj = await get_pool()
     async with pool_obj.acquire() as conn:
-        # Use ILIKE for case-insensitive matching in PostgreSQL.
-        rows = await conn.fetch("SELECT * FROM scraped_calls WHERE title ILIKE '%' || $1 || '%'", keyword)
+        query = "SELECT * FROM scraped_calls WHERE 1=1"
+        params = []
+        # Add keyword filter if provided.
+        if keyword.strip():
+            query += f" AND title ILIKE '%' || ${len(params) + 1} || '%'"
+            params.append(keyword)
+        # Add status filter if not 'all'
+        if status.lower() != "all":
+            query += f" AND lower(status) = ${len(params) + 1}"
+            params.append(status.lower())
+        # Add probability filter if not 'all'
+        if probability.lower() != "all":
+            query += f" AND lower(probability_rate) = ${len(params) + 1}"
+            params.append(probability.lower())
+
+        rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
 
 

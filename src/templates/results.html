@@ -5,84 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scraping Results</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        function applyFilters() {
-          // Get the filter values (all lower-case for uniformity)
-          const status = document.getElementById('status-filter').value.toLowerCase();
-          const probability = document.getElementById('probability-filter').value.toLowerCase();
-          const keyword = document.getElementById('keyword-filter').value.toLowerCase();
-
-          // Get all rows in the table body
-          const rows = document.querySelectorAll("tbody tr");
-
-          rows.forEach(row => {
-            // Assuming your table rows include these data attributes in appropriate cells.
-            // Adjust selectors as needed based on your actual template structure.
-            let statusCell = row.querySelector("[data-column='Status']");
-            let probabilityCell = row.querySelector("[data-column='Probability Rate']");
-            // For keyword search, we check the Title (which is inside an <a> tag) or you could search the whole row text.
-            let titleCell = row.querySelector("td a");
-
-            let rowStatus = statusCell ? statusCell.innerText.trim().toLowerCase() : "";
-            let rowProbability = probabilityCell ? probabilityCell.innerText.trim().toLowerCase() : "";
-            let rowTitle = titleCell ? titleCell.innerText.trim().toLowerCase() : row.innerText.toLowerCase();
-
-            // Determine if row should be shown:
-            let show = true;
-            if (status !== "all" && rowStatus !== status) {
-              show = false;
-            }
-            if (probability !== "all" && rowProbability !== probability) {
-              show = false;
-            }
-            if (keyword && !rowTitle.includes(keyword)) {
-              show = false;
-            }
-            row.style.display = show ? "" : "none";
-          });
-        }
-    </script>
 
 </head>
 <body class="bg-gray-100 text-gray-900">
   <div class="container mx-auto p-6">
 
-    <!-- Unified Filter Area -->
-    <div class="flex gap-4 mb-4">
-      <div>
-        <label class="block font-bold">Status:</label>
-        <select id="status-filter" class="border p-2" onchange="applyFilters()">
-          <option value="all">All</option>
-          <option value="open">Open For Submission</option>
-          <option value="forthcoming">Forthcoming</option>
-          <option value="closed">Closed</option>
-        </select>
-      </div>
-      <div>
-        <label class="block font-bold">Probability Rate:</label>
-        <select id="probability-filter" class="border p-2" onchange="applyFilters()">
-          <option value="all">All</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
-      </div>
-      <div>
-        <label class="block font-bold">Keyword:</label>
-        <!-- Wrap keyword input and button in a form that submits to the search endpoint -->
-        <form action="/search" method="get" class="flex gap-2">
-          <input type="text" id="keyword-filter" name="keyword" class="border p-2" placeholder="Enter keyword...">
-          <button type="submit" class="bg-blue-500 text-white rounded px-4 py-1 hover:bg-blue-600">Search</button>
-        </form>
-      </div>
-    </div>
+<!-- Combined Container for Filters and Export Button -->
+    <div class="flex items-end justify-between mb-4">
+      <!-- Filter Form -->
+      <form action="/search" method="get" class="flex items-end gap-4">
+        <div class="flex flex-col">
+          <label class="font-bold" for="status-filter">Status:</label>
+          <select name="status" id="status-filter" class="border p-2">
+            <option value="all">All</option>
+            <option value="open">Open For Submission</option>
+            <option value="forthcoming">Forthcoming</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <label class="font-bold" for="probability-filter">Probability Rate:</label>
+          <select name="probability" id="probability-filter" class="border p-2">
+            <option value="all">All</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <label class="font-bold" for="keyword-filter">Keyword:</label>
+          <input type="text" name="keyword" id="keyword-filter" class="border p-2" placeholder="Enter keyword...">
+        </div>
+        <div>
+          <button type="submit" class="bg-blue-500 text-white rounded px-4 py-2 hover:bg-blue-600">
+            Search
+          </button>
+        </div>
+      </form>
 
-    <!-- Export to Excel Button -->
-    <div class="flex justify-end mb-4">
+      <!-- Export to Excel Button -->
       <a href="/export-excel" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
         Export to Excel
       </a>
     </div>
+
+
 
     <!-- Results Table -->
     {% if data %}
