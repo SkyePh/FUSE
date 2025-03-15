@@ -88,77 +88,29 @@ def calculate_probability_rate(accepted_projects):
     except ValueError:
         return "Unknown"
 
+def format_openingdate(date_string):
+    try:
+        # Convert ISO date string (YYYY-MM-DD) to a date object
+        date_obj = datetime.strptime(date_string, "%Y-%m-%d").date()
+        return date_obj
+    except ValueError:
+        return None
+
 def format_date(date_string):
     try:
-        # Check if there are two dates separated by a space
-        dates = date_string.split()
-        formatted_dates = []
-
-        for date in dates:
-            # Parse each date and format it
-            date_object = datetime.strptime(date, "%Y-%m-%d")
-            formatted_dates.append(date_object.strftime("%d %b %Y").upper())
-
-        # Join the formatted dates with a space
-        return " ".join(formatted_dates)
+        tokens = date_string.split()
+        # Process tokens in groups of three (for each date)
+        date_objects = []
+        for i in range(0, len(tokens), 3):
+            chunk = " ".join(tokens[i:i+3])
+            # Parse using the format in the scraped string ("17 April 2023")
+            date_obj = datetime.strptime(chunk, "%d %B %Y").date()
+            date_objects.append(date_obj)
+        # If only one date is present, return the date object; otherwise, return a tuple
+        return date_objects[0] if len(date_objects) == 1 else tuple(date_objects)
     except ValueError:
-        return date_string  # Return the original string if parsing fails
-
-def combine_spreadsheet(csv_folder_path, output_excel_file):
-    """Combine CSV files into grouped Excel sheets based on extracted group name."""
-    # Dictionary to store dataframes grouped by the extracted name
-    grouped_dataframes = {}
-
-    # Iterate through all CSV files in the folder
-    for filename in os.listdir(csv_folder_path):
-        if filename.endswith(".csv"):
-            # Extract the group name from the filename
-            group_name = extract_group_name(filename)
-
-            # Read the CSV file into a DataFrame
-            csv_path = os.path.join(csv_folder_path, filename)
-            df = pd.read_csv(csv_path)
-
-            # Add the DataFrame to the appropriate group
-            if group_name not in grouped_dataframes:
-                grouped_dataframes[group_name] = []
-            grouped_dataframes[group_name].append(df)
-
-    # Write to an Excel file, even if there is only one category
-    with pd.ExcelWriter(output_excel_file) as writer:
-        for group_name, dataframes in grouped_dataframes.items():
-            # Concatenate all DataFrames in the group
-            combined_df = pd.concat(dataframes, ignore_index=True)
-            # Write the combined DataFrame to a sheet
-            combined_df.to_excel(writer, sheet_name=group_name, index=False)
-
-    # Apply coloring to the Probability Rate column
-    wb = load_workbook(output_excel_file)
-    for sheet_name in wb.sheetnames:
-        sheet = wb[sheet_name]
-
-        # Find the "Probability Rate" column
-        headers = [cell.value for cell in sheet[1]]  # Assuming the first row contains headers
-        if "Probability Rate" in headers:
-            probability_col_index = headers.index("Probability Rate") + 1
-
-            # Apply coloring
-            for row in range(2, sheet.max_row + 1):  # Skip header row
-                cell = sheet.cell(row=row, column=probability_col_index)
-                if cell.value == "Low":
-                    cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6",
-                                            fill_type="solid")  # Light blue
-                elif cell.value == "Medium":
-                    cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00",
-                                            fill_type="solid")  # Yellow
-                elif cell.value == "High":
-                    cell.fill = PatternFill(start_color="90EE90", end_color="90EE90",
-                                            fill_type="solid")  # Green
-
-    # Save the workbook with the applied styles
-    wb.save(output_excel_file)
-
-    print(f"Excel file created: {output_excel_file}")
+        # If parsing fails, you might want to return None or handle the error as needed
+        return None
 
 
 async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keyword = None, desired_category: list = None, get_categories_only: bool = False):
@@ -450,7 +402,7 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                                 action_type = action_match.group(1) if action_match else "No action"
 
                                 open_date_element = row.select_one(f'td:nth-child({open_date_index})').text.strip()
-                                formatted_opendate = format_date(open_date_element)
+                                formatted_opendate = format_openingdate(open_date_element)
                                 print('bruh3')
 
                                 # Add to the temporary dictionary
@@ -593,21 +545,25 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                 # print(f"Data saved to {category}.csv")
 
                 for _, row in final_df.iterrows():
-                    raw_deadline = row.get("Deadline", "").strip()
-                    tokens = raw_deadline.split()
-                    if len(tokens) == 1:
-                        # Only one token, assume it's a complete date in ISO format.
-                        deadline_primary = tokens[0]
+                    raw_deadline = (row.get("Deadline") or "").strip()
+                    if not raw_deadline:
+                        # Provide a default date (or decide to skip this record)
+                        deadline_primary = datetime.today().date()  # or datetime.strptime("1900-01-01", "%Y-%m-%d").date()
                         deadline_secondary = None
-                    elif len(tokens) >= 3:
-                        deadline_primary = " ".join(tokens[:3])
-                        if len(tokens) >= 6:
-                            deadline_secondary = " ".join(tokens[3:6])
-                        else:
-                            deadline_secondary = None
                     else:
-                        print(f"Skipping record due to incomplete primary deadline: '{raw_deadline}'")
-                        continue
+                        tokens = raw_deadline.split()
+                        if len(tokens) >= 3:
+                            # Parse the first date
+                            try:
+                                deadline_primary = format_date(raw_deadline.split(" ", 3)[0:3])  # Adjust as needed
+                            except Exception as e:
+                                # handle error, e.g. assign a default date
+                                deadline_primary = datetime.today().date()
+                            # Optionally process secondary if available...
+                        else:
+                            # If the record has an incomplete date string, assign a default or skip
+                            deadline_primary = datetime.today().date()
+                            deadline_secondary = None
 
                     #print(title)
 
@@ -622,6 +578,8 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                     # print(category_name)
                     # print(category_id)
 
+                    print(formatted_opendate)
+
                     record = {
                         "identifier": row.get("Identifier"),
                         "title": row.get("Title"),
@@ -630,7 +588,7 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keywo
                         "funding_per_project": row.get("Funding Per Project"),
                         "deadline_primary": deadline_primary,  # e.g., "2021-10-06" or "06 OCT 2024"
                         "deadline_secondary": deadline_secondary,  # e.g., "14 APR 2024" or None
-                        "opening_date": row.get("Opening Date"),
+                        "opening_date": formatted_opendate,
                         "accepted_projects": row.get("Accepted Projects"),
                         "probability_rate": row.get("Probability Rate"),
                         "link": row.get("Link"),
