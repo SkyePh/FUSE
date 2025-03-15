@@ -1,9 +1,12 @@
 import asyncpg
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Replace with your actual PostgreSQL connection URL or set DATABASE_URL in your environment.
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Global connection pool variable
 pool: asyncpg.Pool = None
@@ -24,23 +27,40 @@ async def get_category_id(category_name: str) -> int:
             raise Exception(f"Category '{category_name}' not found.")
 
 
-async def fetch_calls_by_filters(keyword: str = "", status: str = "all", probability: str = "all") -> list:
+from typing import List
+from fastapi import Query
+
+
+async def fetch_calls_by_filters(
+        keyword: str = "",
+        status: List[str] = Query([]),
+        probability: str = "all"
+) -> list:
     pool_obj = await get_pool()
     async with pool_obj.acquire() as conn:
         query = "SELECT * FROM scraped_calls WHERE 1=1"
         params = []
+
         # Add keyword filter if provided.
         if keyword.strip():
             query += f" AND title ILIKE '%' || ${len(params) + 1} || '%'"
             params.append(keyword)
-        # Add status filter if not 'all'
-        if status.lower() != "all":
-            query += f" AND lower(status) = ${len(params) + 1}"
-            params.append(status.lower())
-        # Add probability filter if not 'all'
+
+        # Add status filter if any statuses are provided.
+        if status:
+            # Remove any "all" entries and lower-case each status.
+            filtered_statuses = [s.lower() for s in status if s.lower() != "all"]
+            if filtered_statuses:
+                query += f" AND lower(status) = ANY(${len(params) + 1})"
+                params.append(filtered_statuses)
+
+        # Add probability filter if not "all".
         if probability.lower() != "all":
             query += f" AND lower(probability_rate) = ${len(params) + 1}"
             params.append(probability.lower())
+
+        print("Built query:", query)
+        print("Parameters:", params)
 
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
