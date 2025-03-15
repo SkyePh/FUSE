@@ -172,19 +172,32 @@ async def get_results(request: Request):
     """
     Fetches the scraped results and displays them in an HTML page.
     """
-    data = await fetch_calls_by_filters(keyword="", status="Forthcoming", probability="All")
+    default_status=["open for submission", "forthcoming"]
+    data = await fetch_calls_by_filters(keyword="", status=default_status, probability="All")
 
-    return templates.TemplateResponse("results.html", {"request": request, "data": data})
+    return templates.TemplateResponse("results.html", {
+        "request": request,
+        "data": data,
+        "selected_status": default_status,
+        "keyword": "",
+        "selected_probability": "all"
+    })
 
 @app.get("/search", response_class=HTMLResponse)
 async def search_calls(
     request: Request,
     keyword: str = "",
-    status: str = "all",
+    status: List[str] = Query([]),
     probability: str = "all"
 ):
-    data = await fetch_calls_by_filters(keyword, status, probability)
-    return templates.TemplateResponse("results.html", {"request": request, "data": data})
+    data = await fetch_calls_by_filters(keyword=keyword, status=status, probability=probability)
+    return templates.TemplateResponse("results.html", {
+        "request": request,
+        "data": data,
+        "selected_status": status,  # List of selected statuses
+        "keyword": keyword,
+        "selected_probability": probability
+    })
 
 def extract_group_name(identifier):
     """Extracts the category group from an identifier (e.g., 'HORIZON-CL5-D4' -> 'CL5')."""
