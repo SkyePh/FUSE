@@ -172,14 +172,7 @@ async def get_results(request: Request):
     """
     Fetches the scraped results and displays them in an HTML page.
     """
-    # results_json_path = "scraped_results.json"
-    # progress_flag = "scraping_in_progress.json"
-    #
-    # if os.path.exists(progress_flag):
-    #     return templates.TemplateResponse("loading.html",
-    #                                       {"request": request, "message": "Scraping still in progress..."})
-
-    data = await fetch_all_calls()
+    data = await fetch_calls_by_filters(keyword="", status="Forthcoming", probability="All")
 
     return templates.TemplateResponse("results.html", {"request": request, "data": data})
 
