@@ -77,39 +77,39 @@
         <table class="table-auto w-full border-collapse border border-gray-400 bg-white">
           <thead>
             <tr class="bg-gray-200">
-              <th class="border border-gray-400 px-4 py-2">Identifier</th>
-              <th class="border border-gray-400 px-4 py-2">Category</th>
-              <th class="border border-gray-400 px-4 py-2">Action</th>
-              <th class="border border-gray-400 px-4 py-2">Title</th>
-              <th class="border border-gray-400 px-4 py-2">Budget</th>
-              <th class="border border-gray-400 px-4 py-2">Opening Date</th>
-              <th class="border border-gray-400 px-4 py-2">Primary Deadline</th>
-              <th class="border border-gray-400 px-4 py-2">Secondary Deadline</th>
-              <th class="border border-gray-400 px-4 py-2">Accepted Projects</th>
-              <th class="border border-gray-400 px-4 py-2">Funding Per Project</th>
-              <th class="border border-gray-400 px-4 py-2" data-column="Status">Status</th>
-              <th class="border border-gray-400 px-4 py-2" data-column="Probability Rate">Probability Rate</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Identifier</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Category</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Action</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Title</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Budget</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Opening Date</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Primary Deadline</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Secondary Deadline</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Accepted Projects</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap">Funding Per Project</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Status">Status</th>
+              <th class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Probability Rate">Probability Rate</th>
             </tr>
           </thead>
           <tbody>
             {% for row in data %}
             <tr class="hover:bg-gray-100">
-              <td class="border border-gray-400 px-4 py-2">{{ row["identifier"] }}</td>
-              <td class="border border-gray-400 px-4 py-2">{{ row["category_id"] }}</td>
-              <td class="border border-gray-400 px-4 py-2" data-column="Action">{{ row["action_type"] }}</td>
-              <td class="border border-gray-400 px-4 py-2">
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["identifier"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["category_id"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Action">{{ row["action_type"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">
                 <a href="{{ row['link'] }}" target="_blank" class="text-blue-500 hover:underline">
                   {{ row["title"] }}
                 </a>
               </td>
-              <td class="border border-gray-400 px-4 py-2">{{ row["budget"] }}</td>
-              <td class="border border-gray-400 px-4 py-2" data-column="Opening Date">{{ row["opening_date"] }}</td>
-              <td class="border border-gray-400 px-4 py-2" data-column="Primary Deadline">{{ row["deadline_primary"] }}</td>
-              <td class="border border-gray-400 px-4 py-2" data-column="Secondary Deadline">{{ row["deadline_secondary"] }}</td>
-              <td class="border border-gray-400 px-4 py-2">{{ row["accepted_projects"] }}</td>
-              <td class="border border-gray-400 px-4 py-2">{{ row["funding_per_project"] }}</td>
-              <td class="border border-gray-400 px-4 py-2" data-column="Status">{{ row["status"] if row.get("status") else "" }}</td>
-              <td class="border border-gray-400 px-4 py-2" data-column="Probability Rate"
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["budget"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Opening Date">{{ row["opening_date"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Primary Deadline">{{ row["deadline_primary"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Secondary Deadline">{{ row["deadline_secondary"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["accepted_projects"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["funding_per_project"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Status">{{ row["status"] if row.get("status") else "" }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Probability Rate"
                   {% if row['probability_rate']|lower == 'low' %}
                       style="background-color: #ADD8E6;"
                   {% elif row['probability_rate']|lower == 'medium' %}
