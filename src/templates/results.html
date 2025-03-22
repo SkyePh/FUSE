@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
 </head>
+
 <body class="bg-gray-100 text-gray-900">
 <header class="fixed top-0 left-0 right-0 bg-white shadow p-4 flex justify-between items-center z-50">
   <div class="flex items-center space-x-4">
@@ -64,7 +65,7 @@
 
 
       <!-- Export to Excel Button -->
-      <a href="/export-excel" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+      <a href="/export-excel?keyword={{ keyword }}&statuses={{ selected_status | join(',') }}&probability={{ selected_probability }}" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
         Export to Excel
       </a>
     </div>
@@ -95,7 +96,7 @@
             {% for row in data %}
             <tr class="hover:bg-gray-100">
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["identifier"] }}</td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["category_id"] }}</td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["category_name"] }}</td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Action">{{ row["action_type"] }}</td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">
                 <a href="{{ row['link'] }}" target="_blank" class="text-blue-500 hover:underline">

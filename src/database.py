@@ -2,6 +2,9 @@ import asyncpg
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from typing import List
+from fastapi import Query
+
 
 load_dotenv()
 
@@ -26,37 +29,50 @@ async def get_category_id(category_name: str) -> int:
         else:
             raise Exception(f"Category '{category_name}' not found.")
 
-
-from typing import List
-from fastapi import Query
-
-
 async def fetch_calls_by_filters(
-        keyword: str = "",
-        status: List[str] = Query([]),
-        probability: str = "all"
+    keyword: str = "",
+    status: List[str] = Query([]),
+    probability: str = "all"
 ) -> list:
     pool_obj = await get_pool()
     async with pool_obj.acquire() as conn:
-        query = "SELECT * FROM scraped_calls WHERE 1=1"
+        # Base SELECT + JOIN
+        query = """
+            SELECT 
+                sc.identifier,
+                sc.title,
+                sc.action_type,
+                sc.budget,
+                sc.funding_per_project,
+                sc.deadline_primary,
+                sc.deadline_secondary,
+                sc.accepted_projects,
+                sc.probability_rate,
+                sc.link,
+                sc.opening_date,
+                c.name AS category_name,
+                sc.status
+            FROM scraped_calls AS sc
+            INNER JOIN categories AS c ON sc.category_id = c.id
+            WHERE 1=1
+        """
         params = []
 
-        # Add keyword filter if provided.
+        # Keyword filter (against identifier OR title)
         if keyword.strip():
-            query += f" AND title ILIKE '%' || ${len(params) + 1} || '%'"
+            query += f" AND (lower(sc.identifier) ILIKE '%' || ${len(params)+1} || '%' OR lower(sc.title) ILIKE '%' || ${len(params)+1} || '%')"
             params.append(keyword)
 
-        # Add status filter if any statuses are provided.
+        # Status filter (ANY array)
         if status:
-            # Remove any "all" entries and lower-case each status.
-            filtered_statuses = [s.lower() for s in status if s.lower() != "all"]
-            if filtered_statuses:
-                query += f" AND lower(status) = ANY(${len(params) + 1})"
-                params.append(filtered_statuses)
+            filtered = [s.lower() for s in status if s.lower() != "all"]
+            if filtered:
+                query += f" AND lower(sc.status) = ANY(${len(params)+1})"
+                params.append(filtered)
 
-        # Add probability filter if not "all".
+        # Probability filter
         if probability.lower() != "all":
-            query += f" AND lower(probability_rate) = ${len(params) + 1}"
+            query += f" AND lower(sc.probability_rate) = ${len(params)+1}"
             params.append(probability.lower())
 
         print("Built query:", query)
@@ -64,6 +80,7 @@ async def fetch_calls_by_filters(
 
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
+
 
 
 async def store_category(name: str, description: str = "No Description") -> int:
