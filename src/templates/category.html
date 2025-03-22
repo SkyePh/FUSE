@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Category: {{ category }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-indigo-50 text-gray-900">
+
+  <!-- Sticky Header -->
+  <header class="fixed top-0 left-0 right-0 bg-indigo-600 shadow p-4 flex justify-between items-center z-50">
+    <div class="flex items-center space-x-4">
+      <span class="font-bold text-2xl text-white">FUSE</span>
+      <a href="/results" class="text-indigo-200 hover:text-white">Home</a>
+    </div>
+    <div class="text-lg text-indigo-200">M Philippou | UCLan InSPIRE</div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="pt-24 container mx-auto px-6 pb-12">
+    <div class="bg-white rounded-xl shadow-lg border-l-8 border-indigo-500 p-8">
+      <h1 class="text-5xl font-extrabold text-indigo-700 mb-4">Category: {{ category }}</h1>
+    <div class="mt-6 flex gap-4">
+
+  <div class="mt-6 flex gap-4">
+  <!-- View All Calls (keyword last) -->
+  <a
+    href="/search?status=open+for+submission&status=forthcoming&status=closed&probability=all&keyword={{ category | urlencode }}"
+    class="bg-indigo-600 text-white font-semibold px-5 py-2 rounded hover:bg-indigo-700 transition">
+    View All Data
+  </a>
+
+  <!-- Export All Calls (keyword last) -->
+  <a
+    href="/export-excel?status=open+for+submission&status=forthcoming&status=closed&probability=all&keyword={{ category | urlencode }}"
+    class="bg-green-500 text-white font-semibold px-5 py-2 rounded hover:bg-green-600 transition">
+    Export To Excel
+  </a>
+</div>
+
+</div>
+
+      {% if identifiers %}
+        <p class="text-indigo-500 mb-6">{{ identifiers|length }} calls found</p>
+        <ul class="space-y-4">
+          {% for id in identifiers %}
+            <li class="flex justify-between items-center bg-indigo-50 rounded-lg px-4 py-3 hover:bg-indigo-100 transition">
+              <span class="font-medium text-indigo-900">{{ id }}</span>
+              <a href="/search?keyword={{ id }}" class="text-indigo-600 hover:text-indigo-800">View →</a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-gray-500">No calls found for this category.</p>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>
