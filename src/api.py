@@ -209,90 +209,110 @@ def extract_group_name(identifier):
     else:
         return identifier  # Fallback for unknown formats
 
+@app.get("/category/{cat_name}", response_class=HTMLResponse)
+async def view_category(request: Request, cat_name: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT sc.identifier
+            FROM scraped_calls AS sc
+            INNER JOIN categories AS c ON sc.category_id = c.id
+            WHERE lower(c.name) = lower($1)
+            """,
+            cat_name
+        )
+    identifiers = [row["identifier"] for row in rows]
+    return templates.TemplateResponse("category.html", {
+        "request": request,
+        "category": cat_name,
+        "identifiers": identifiers
+    })
+
 @app.get("/export-excel")
 async def export_excel(
     keyword: str = "",
-    statuses: str = "",  # comma-separated statuses, e.g., "open,closed"
+    statuses: str = "",
     probability: str = "all"
 ):
-    """
-    Generate an Excel file from the filtered results in the DB and provide it for download.
-    The filters (keyword, statuses, probability) should match those currently used on-screen.
-    """
     output_excel_path = "scraped_results.xlsx"
 
-    # Build a dynamic SQL query based on the filters.
-    pool_obj = await get_pool()
-    async with pool_obj.acquire() as conn:
-        query = "SELECT * FROM scraped_calls WHERE 1=1"
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        query = """
+            SELECT
+                sc.identifier,
+                sc.title,
+                sc.action_type,
+                sc.budget,
+                sc.funding_per_project,
+                sc.deadline_primary,
+                sc.deadline_secondary,
+                sc.accepted_projects,
+                sc.probability_rate,
+                sc.link,
+                sc.opening_date,
+                c.name AS category_name,
+                sc.status
+            FROM scraped_calls sc
+            INNER JOIN categories c ON sc.category_id = c.id
+            WHERE 1=1
+        """
         params = []
-        param_index = 1
+        idx = 1
 
-        if keyword:
-            query += f" AND title ILIKE '%' || ${param_index} || '%'"
+        if keyword.strip():
+            query += (
+                f" AND (lower(sc.identifier) ILIKE '%' || ${idx} || '%' "
+                f"OR lower(sc.title) ILIKE '%' || ${idx} || '%')"
+            )
             params.append(keyword)
-            param_index += 1
+            idx += 1
 
-        # If statuses are provided (as a comma-separated string), filter on them.
         if statuses:
-            # Convert comma-separated string into a list (and normalize to lower-case)
             status_list = [s.strip().lower() for s in statuses.split(",") if s.strip()]
-            # Use the PostgreSQL ANY operator
-            query += f" AND lower(status) = ANY(${param_index})"
+            query += f" AND lower(sc.status) = ANY(${idx})"
             params.append(status_list)
-            param_index += 1
+            idx += 1
 
-        # If probability is provided and not "all", add that filter.
-        if probability and probability.lower() != "all":
-            query += f" AND lower(probability_rate) = ${param_index}"
+        if probability.lower() != "all":
+            query += f" AND lower(sc.probability_rate) = ${idx}"
             params.append(probability.lower())
-            param_index += 1
+            idx += 1
 
-        # Execute the query.
         rows = await conn.fetch(query, *params)
-        data = [dict(row) for row in rows]
+        data = [dict(r) for r in rows]
 
     if not data:
         return {"error": "No data found"}
 
-    # Group results by category.
-    grouped_data = {}
+    grouped = {}
     for entry in data:
-        # Use your existing function to extract the group name from the identifier.
-        identifier = entry.get("identifier", "Unknown")
-        category_group = extract_group_name(identifier)
-        if category_group not in grouped_data:
-            grouped_data[category_group] = []
-        grouped_data[category_group].append(entry)
+        group = entry["category_name"] or "Unknown"
+        grouped.setdefault(group, []).append(entry)
 
     with pd.ExcelWriter(output_excel_path) as writer:
-        for category, entries in grouped_data.items():
+        for cat, entries in grouped.items():
             df = pd.DataFrame(entries)
-            # Remove the database ID column if present
             df.drop(columns=["id"], errors="ignore", inplace=True)
-            df.to_excel(writer, sheet_name=category[:31], index=False)
+            df.to_excel(writer, sheet_name=cat[:31], index=False)
 
-    # Apply color formatting to the "Probability Rate" column.
     wb = load_workbook(output_excel_path)
-    for sheet_name in wb.sheetnames:
-        sheet = wb[sheet_name]
-        headers = [cell.value for cell in sheet[1]]  # first row as headers
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        headers = [c.value for c in ws[1]]
         if "Probability Rate" in headers:
-            probability_col_index = headers.index("Probability Rate") + 1  # 1-based index
-            for row in range(2, sheet.max_row + 1):
-                cell = sheet.cell(row=row, column=probability_col_index)
-                if cell.value == "Low":
-                    cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
-                elif cell.value == "Medium":
-                    cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-                elif cell.value == "High":
-                    cell.fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+            col = headers.index("Probability Rate") + 1
+            for r in range(2, ws.max_row + 1):
+                cell = ws.cell(row=r, column=col)
+                color = {"low":"ADD8E6","medium":"FFFF00","high":"90EE90"}.get((cell.value or "").lower())
+                if color:
+                    cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
     wb.save(output_excel_path)
-    print(f"✅ Excel file created successfully: {output_excel_path}")
 
     return FileResponse(
         output_excel_path,
-        filename="scraped_results.xlsx",
+        filename="filtered_results.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
