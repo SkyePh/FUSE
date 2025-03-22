@@ -209,7 +209,6 @@ def extract_group_name(identifier):
     else:
         return identifier  # Fallback for unknown formats
 
-
 @app.get("/export-excel")
 async def export_excel(
     keyword: str = "",
@@ -266,13 +265,12 @@ async def export_excel(
             grouped_data[category_group] = []
         grouped_data[category_group].append(entry)
 
-    # Write grouped data to an Excel file with separate sheets.
     with pd.ExcelWriter(output_excel_path) as writer:
         for category, entries in grouped_data.items():
             df = pd.DataFrame(entries)
-            # Limit sheet name length if needed.
-            sheet_name = category[:31]
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Remove the database ID column if present
+            df.drop(columns=["id"], errors="ignore", inplace=True)
+            df.to_excel(writer, sheet_name=category[:31], index=False)
 
     # Apply color formatting to the "Probability Rate" column.
     wb = load_workbook(output_excel_path)
