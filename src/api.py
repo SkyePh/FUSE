@@ -165,8 +165,6 @@ async def scrape_endpoint(
     return RedirectResponse(url="/loading?redirect_url=/results", status_code=303)
 
 
-
-
 @app.get("/results")
 async def get_results(request: Request):
     """
