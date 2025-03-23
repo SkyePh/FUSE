@@ -60,7 +60,11 @@ async def fetch_calls_by_filters(
 
         # Keyword filter (against identifier OR title)
         if keyword.strip():
-            query += f" AND (lower(sc.identifier) ILIKE '%' || ${len(params)+1} || '%' OR lower(sc.title) ILIKE '%' || ${len(params)+1} || '%')"
+            query += (
+                f" AND (lower(sc.identifier) ILIKE '%' || ${len(params) + 1} || '%' "
+                f"OR lower(sc.title) ILIKE '%' || ${len(params) + 1} || '%' "
+                f"OR lower(c.name) ILIKE '%' || ${len(params) + 1} || '%')"
+            )
             params.append(keyword)
 
         # Status filter (ANY array)
