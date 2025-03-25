@@ -10,8 +10,6 @@ from openpyxl.styles import PatternFill
 import json
 from database import store_call, store_category, get_category_id
 
-#TODO fix the keyword searching
-
 # Save results in JSON format
 results_json_path = "scraped_results.json"
 
@@ -21,7 +19,6 @@ csv_folder = "."
 # Name of the output Excel file
 output_excel = "combined_excel_file.xlsx"
 
-
 async def status_click(page, status_dict, selected_statuses, all_filters_selector):
     """
     Opens the 'All Filters' menu, checks/unchecks statuses, and applies additional filters.
@@ -29,9 +26,7 @@ async def status_click(page, status_dict, selected_statuses, all_filters_selecto
     Args:
         page: The Playwright page instance.
         status_dict: A dictionary mapping status names to their HTML checkbox IDs.
-                     Example: {"closed": "31094503", "forthcoming": "31094504", "open": "31094505"}
         selected_statuses: A dictionary specifying which statuses should be checked (True) or unchecked (False).
-                           Example: {"closed": True, "forthcoming": False, "open": True}
         all_filters_selector: The CSS selector for the 'All Filters' button.
     """
 
@@ -68,7 +63,7 @@ async def status_click(page, status_dict, selected_statuses, all_filters_selecto
 
 
 def extract_group_name(filename):
-    """Extract the desired part of the filename (e.g., CL4 from HORIZON-CL4-D3-2024)."""
+    """Extract the desired part of the filename"""
     parts = filename.split('-')
     if parts[0]=="HORIZON":
         return parts[1]
