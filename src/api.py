@@ -41,18 +41,12 @@ from fastapi.responses import RedirectResponse
 
 @app.get("/home")
 async def home(request: Request):
-    """
-    Step 1: Ask if the user wants closed calls.
-    Step 2: Show loading page while fetching categories.
-    """
 
     return templates.TemplateResponse("home.html", {"request": request})
 
 @app.get("/choose_closed")
 async def choose_closed(request: Request):
-    """
-    Ask user whether they want closed calls.
-    """
+
     return templates.TemplateResponse("choose_closed.html", {"request": request})
 
 
@@ -68,14 +62,14 @@ async def fetch_categories(
     Fetch categories and pass them directly to /categories via query parameters.
     """
 
-    print(f"📥 Raw Data from Form Submission → Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
+    print(f"Raw Data from Form Submission → Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
 
     # Convert "true"/"false" strings to actual booleans
     closed_bool = closed.lower() == "true"
     forthcoming_bool = forthcoming.lower() == "true"
     open_bool = open_.lower() == "true"
 
-    print(f"✅ Converted Bools → Closed: {closed_bool}, Forthcoming: {forthcoming_bool}, Open: {open_bool}")
+    print(f"Converted Bools → Closed: {closed_bool}, Forthcoming: {forthcoming_bool}, Open: {open_bool}")
 
     # Fetch categories from scraper
     categories = await scrape_eu_portal(
@@ -86,7 +80,7 @@ async def fetch_categories(
         keyword=keyword
     )
 
-    print("✅ Categories Retrieved from Scraper:", categories)
+    print("Categories Retrieved from Scraper:", categories)
 
     return templates.TemplateResponse("options.html", {
         "request": request,
@@ -108,7 +102,7 @@ async def categories_page(
     """
     Load category selection page using query parameters.
     """
-    print("🟠 Categories from Query Params:", categories)
+    print("Categories from Query Params:", categories)
     print(f"Filters - Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
 
     return templates.TemplateResponse("options.html", {
@@ -149,7 +143,7 @@ async def scrape_endpoint(
     """
     Starts scraping for selected categories in the background with filtering options.
     """
-    print("🟠 Scrape Endpoint Called")
+    print("Scrape Endpoint Called")
     print(f"Selected Categories: {categories}")
     print(f"Filters - Closed: {closed}, Forthcoming: {forthcoming}, Open: {open_}")
 
@@ -198,7 +192,7 @@ async def search_calls(
     })
 
 def extract_group_name(identifier):
-    """Extracts the category group from an identifier (e.g., 'HORIZON-CL5-D4' -> 'CL5')."""
+    """Extracts the category group from an identifier"""
     parts = identifier.split('-')
     if parts[0] == "HORIZON" and len(parts) > 1:
         return parts[1]  # Returns 'CL5' from 'HORIZON-CL5-D4'

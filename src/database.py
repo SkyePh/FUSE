@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from typing import List
 from fastapi import Query
 
-
 load_dotenv()
 
 # Replace with your actual PostgreSQL connection URL or set DATABASE_URL in your environment.
