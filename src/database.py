@@ -78,8 +78,8 @@ async def fetch_calls_by_filters(
             query += f" AND lower(sc.probability_rate) = ${len(params)+1}"
             params.append(probability.lower())
 
-        print("Built query:", query)
-        print("Parameters:", params)
+        # print("Built query:", query)
+        # print("Parameters:", params)
 
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
