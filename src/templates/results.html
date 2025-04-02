@@ -63,7 +63,6 @@
   </div>
 </form>
 
-
       <!-- Export to Excel Button -->
       <a href="/export-excel?keyword={{ keyword }}&statuses={{ selected_status | join(',') }}&probability={{ selected_probability }}" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
         Export to Excel
@@ -107,12 +106,22 @@
                   {{ row["title"] }}
                 </a>
               </td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["budget"] }}</td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Opening Date">{{ row["opening_date"] }}</td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Primary Deadline">{{ row["deadline_primary"] }}</td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Secondary Deadline">{{ row["deadline_secondary"] }}</td>
+                <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">
+                  {{ row["budget"] | format_number }}
+                </td>
+              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Opening Date">
+                  {{ row["opening_date"] | format_date }}
+                </td>
+                <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Primary Deadline">
+                  {{ row["deadline_primary"] | format_date }}
+                </td>
+                <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Secondary Deadline">
+                  {{ row["deadline_secondary"] | format_date }}
+                </td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["accepted_projects"] }}</td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["funding_per_project"] }}</td>
+                <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">
+                  {{ row["funding_per_project"] | format_funding }}
+                </td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Status">{{ row["status"] if row.get("status") else "" }}</td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Probability Rate"
                   {% if row['probability_rate']|lower == 'low' %}
@@ -129,6 +138,8 @@
           </tbody>
         </table>
     </div>
+
+
     {% else %}
     <p class="text-red-500">No results found. Please start a new scrape.</p>
     {% endif %}

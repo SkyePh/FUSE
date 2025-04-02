@@ -1,3 +1,12 @@
+#TODO
+# - Change sheets formatting to more general (cl4 with all years and cats)
+# - Draft reader (pdf)
+# - Comparison (2022 v 2023 for one category)
+# - Sorting realtime on table and export it like that (sort by deadline)
+# - Funding intensity rate
+# - searching for cl6 2022 i think didn't work for each call. it brought everything
+
+
 from playwright.async_api import async_playwright
 import asyncio
 from bs4 import BeautifulSoup
