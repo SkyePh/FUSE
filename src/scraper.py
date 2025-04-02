@@ -1,5 +1,4 @@
 #TODO
-# - Change sheets formatting to more general (cl4 with all years and cats)
 # - Draft reader (pdf)
 # - Comparison (2022 v 2023 for one category)
 # - Sorting realtime on table and export it like that (sort by deadline)
@@ -18,6 +17,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 import json
 from database import store_call, store_category, get_category_id
+
 
 # Save results in JSON format
 results_json_path = "scraped_results.json"
