@@ -104,8 +104,6 @@ async def root():
     """ Redirect root to home """
     return RedirectResponse(url="/home")
 
-from fastapi.responses import RedirectResponse
-
 @app.get("/home")
 async def home(request: Request):
 
@@ -294,6 +292,16 @@ async def view_category(request: Request, cat_name: str):
         "identifiers": identifiers
     })
 
+
+def extract_cluster(identifier: str) -> str:
+    """
+    Extracts the cluster from an identifier.
+    """
+    parts = identifier.split('-')
+    if parts and parts[0].upper() == "HORIZON" and len(parts) > 1:
+        return parts[1].upper()  # e.g. "CL6"
+    return identifier.upper()
+
 @app.get("/export-excel")
 async def export_excel(
     keyword: str = "",
@@ -353,8 +361,8 @@ async def export_excel(
 
     grouped = {}
     for entry in data:
-        group = entry["category_name"] or "Unknown"
-        grouped.setdefault(group, []).append(entry)
+        cluster = extract_cluster(entry.get("identifier", "Unknown"))
+        grouped.setdefault(cluster, []).append(entry)
 
     with pd.ExcelWriter(output_excel_path) as writer:
         for cat, entries in grouped.items():
