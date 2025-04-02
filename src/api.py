@@ -13,6 +13,7 @@ from starlette.responses import HTMLResponse
 from scraper import scrape_eu_portal
 import sys
 import os
+from datetime import datetime, date
 from urllib.parse import urlencode
 import json
 from database import fetch_all_calls, fetch_calls_by_filters, get_pool
@@ -27,6 +28,22 @@ app.add_middleware(SessionMiddleware, secret_key="secretkey")
 
 # Set up Jinja2 templates
 templates = Jinja2Templates(directory="templates")
+
+def format_date(value):
+    if value is None:
+        return ""
+    try:
+        # If value is already a date or datetime object, use it directly.
+        if isinstance(value, (date, datetime)):
+            return value.strftime("%d %b %Y").upper()
+        # Otherwise assume it's an ISO string in the format "YYYY-MM-DD"
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%d %b %Y").upper()
+    except Exception as e:
+        print("format_date error:", e)
+        return value
+
+templates.env.filters['format_date'] = format_date
+
 
 # Serve static files (if needed)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -174,6 +191,12 @@ async def get_results(request: Request):
         "keyword": "",
         "selected_probability": "all"
     })
+
+@app.get("/results_ssbi")
+async def results_iframe(request: Request):
+
+    return templates.TemplateResponse("results_iframe.html", {"request": request})
+
 
 @app.get("/search", response_class=HTMLResponse)
 async def search_calls(
