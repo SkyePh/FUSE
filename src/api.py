@@ -13,6 +13,7 @@ from starlette.responses import HTMLResponse
 from scraper import scrape_eu_portal
 import sys
 import os
+import re
 from datetime import datetime, date
 from urllib.parse import urlencode
 import json
@@ -29,6 +30,7 @@ app.add_middleware(SessionMiddleware, secret_key="secretkey")
 # Set up Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
+#template formats
 def format_date(value):
     if value is None:
         return ""
@@ -44,6 +46,54 @@ def format_date(value):
 
 templates.env.filters['format_date'] = format_date
 
+def format_number(value):
+    try:
+        # Convert the value to a float and format it with commas, no decimals
+        return "{:,.0f}".format(float(value))
+    except Exception as e:
+        return value
+
+templates.env.filters['format_number'] = format_number
+
+
+def format_funding(value):
+    try:
+        # If the value is empty or not a string, just return it.
+        if not isinstance(value, str) or not value.strip():
+            return value
+
+        # Case 1: "~ 5000000"
+        if value.strip().startswith("~"):
+            # Extract the number after "~"
+            m = re.search(r"~\s*(\d+)", value)
+            if m:
+                num = int(m.group(1))
+                formatted_num = "{:,.0f}".format(num)
+                return f"~ {formatted_num}"
+
+        # Case 2: "Min: 400000 Max: 500000"
+        if "Min:" in value and "Max:" in value:
+            # Extract both numbers using a regex
+            m = re.search(r"Min:\s*(\d+)\s*Max:\s*(\d+)", value)
+            if m:
+                min_num = int(m.group(1))
+                max_num = int(m.group(2))
+                formatted_min = "{:,.0f}".format(min_num)
+                formatted_max = "{:,.0f}".format(max_num)
+                return f"Min: {formatted_min} Max: {formatted_max}"
+
+        # Fallback: if it's a plain number (as a string)
+        try:
+            num = float(value)
+            return "{:,.0f}".format(num)
+        except Exception:
+            return value
+    except Exception as e:
+        print("format_funding error:", e)
+        return value
+
+
+templates.env.filters['format_funding'] = format_funding
 
 # Serve static files (if needed)
 app.mount("/static", StaticFiles(directory="static"), name="static")

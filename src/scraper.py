@@ -1,5 +1,4 @@
 #TODO
-# - Format budget prices (',')
 # - Change sheets formatting to more general (cl4 with all years and cats)
 # - Draft reader (pdf)
 # - Comparison (2022 v 2023 for one category)

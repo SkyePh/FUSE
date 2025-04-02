@@ -106,7 +106,9 @@
                   {{ row["title"] }}
                 </a>
               </td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["budget"] }}</td>
+                <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">
+                  {{ row["budget"] | format_number }}
+                </td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Opening Date">
                   {{ row["opening_date"] | format_date }}
                 </td>
@@ -117,7 +119,9 @@
                   {{ row["deadline_secondary"] | format_date }}
                 </td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["accepted_projects"] }}</td>
-              <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">{{ row["funding_per_project"] }}</td>
+                <td class="border border-gray-400 px-4 py-2 whitespace-nowrap">
+                  {{ row["funding_per_project"] | format_funding }}
+                </td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Status">{{ row["status"] if row.get("status") else "" }}</td>
               <td class="border border-gray-400 px-4 py-2 whitespace-nowrap" data-column="Probability Rate"
                   {% if row['probability_rate']|lower == 'low' %}
