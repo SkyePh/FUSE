@@ -9,6 +9,10 @@
 2. Install the required dependencies:
 
   ```bash
+  npm install
+  ```
+ 
+  ```bash
   pip install -r requirements.txt
   ```
 3. Install Playwright and its required browsers:
@@ -17,7 +21,7 @@
   playwright install
   ```
 
-## Usage for 
+## Usage
 
    ```bash
    cd src
