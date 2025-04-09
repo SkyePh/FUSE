@@ -121,8 +121,7 @@ async def fetch_categories(
     closed: str = Form("false"),
     forthcoming: str = Form("false"),
     open_: str = Form("false", alias="open"),
-    keyword: Optional[str] = Form("")
-):
+    ):
     """
     Fetch categories and pass them directly to /categories via query parameters.
     """
@@ -142,7 +141,6 @@ async def fetch_categories(
         closed_option=closed_bool,
         forthcoming_option=forthcoming_bool,
         open_option=open_bool,
-        keyword=keyword
     )
 
     print("Categories Retrieved from Scraper:", categories)

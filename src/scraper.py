@@ -1,10 +1,8 @@
 #TODO
 # - Draft reader (pdf)
-# - Comparison (2022 v 2023 for one category)
+# - Comparison (2022 v 2023 for one category) (for later phase)
 # - Sorting realtime on table and export it like that (sort by deadline)
-# - Funding intensity rate
-# - searching for cl6 2022 i think didn't work for each call. it brought everything
-
+# - Funding intensity rate (funding rate in description)
 
 from playwright.async_api import async_playwright
 import asyncio
@@ -69,16 +67,6 @@ async def status_click(page, status_dict, selected_statuses, all_filters_selecto
 
     print("Filters applied successfully.")
 
-
-
-def extract_group_name(filename):
-    """Extract the desired part of the filename"""
-    parts = filename.split('-')
-    if parts[0]=="HORIZON":
-        return parts[1]
-    else:
-        return parts[0]
-
 # Create the 'Probability Rate' column
 def calculate_probability_rate(accepted_projects):
     try:
@@ -117,7 +105,7 @@ def format_date(date_string):
         return None
 
 
-async def scrape_eu_portal(closed_option, forthcoming_option, open_option, keyword = None, desired_category: list = None, get_categories_only: bool = False):
+async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desired_category: list = None, get_categories_only: bool = False):
     async with async_playwright() as p:
 
         # Create "scraping in progress" flag
