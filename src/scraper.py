@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 import os
-from datetime import datetime
+from datetime import datetime, date
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 import json
@@ -358,6 +358,22 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                             # Extract table data
                             html = await new_tab.content()
                             soup = BeautifulSoup(html, "html.parser")
+
+                            #funding rate extractor
+                            # Assume 'soup' is your BeautifulSoup object from the call details page
+                            page_text = soup.get_text(separator=" ", strip=True)
+
+                            # Use regex to search for the funding rate pattern.
+                            match = re.search(r'funding rate of\s+(\d+)%', page_text, re.IGNORECASE)
+                            if match:
+                                funding_rate_int = int(match.group(1))
+                                print(f"Extracted funding rate (int): {funding_rate_int}")
+                            else:
+                                funding_rate_int = None
+                                print("Funding rate not found.")
+
+
+
                             rows = soup.select('table.eui-table tbody tr')
 
                             identifier_to_action = {}
@@ -382,7 +398,7 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                             if accepted_projects_index is None:
                                 raise ValueError("Accepted Projects column not found")
 
-
+                            #TODO change following for loop to take care of malformed table stuff maybe if else
                             for row in rows:
                                 # Extract identifier and truncate at the first whitespace
                                 identifier_element = row.select_one('td:nth-child(1)')
@@ -395,7 +411,7 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
 
                                 open_date_element = row.select_one(f'td:nth-child({open_date_index})').text.strip()
                                 formatted_opendate = format_openingdate(open_date_element)
-                                print('bruh3')
+
 
                                 # Add to the temporary dictionary
                                 identifier_to_action[identifier] = action_type
@@ -412,12 +428,12 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                                         if value != "":  # update only if non-empty
                                             budget = value.replace(" ", "").rstrip(".")
 
-                                print('bruh4')
+
                                 # Extract deadline
                                 deadline = row.select_one(f'td:nth-child({deadline_index})').text.strip()
                                 formatted_deadline = format_date(deadline)
 
-                                print('bruh5')
+
                                 # Extract funding per submission
                                 funding_element = row.select_one(f'td:nth-child({funding_per_sub_index})')
                                 raw_funding = funding_element.text.strip() if funding_element else "No funding info"
@@ -433,7 +449,7 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                                 # Extract accepted submissions
                                 accepted_submissions = row.select_one(f'td:nth-child({accepted_projects_index})').text.strip()
 
-                                print('bruh6')
+
                                 # Append to table_data
                                 table_data.append({
                                     "Identifier": identifier,
@@ -442,14 +458,15 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                                     "Budget": budget,
                                     "Deadline": formatted_deadline,
                                     "Funding Per Project": funding_per_submission,
-                                    "Accepted Projects": accepted_submissions
+                                    "Accepted Projects": accepted_submissions,
+                                    "Funding Rate": funding_rate_int
                                 })
 
-                            print('bruh7')
+
                             # Merge the Action Type into titles_data using the Identifier as the key
                             for item in titles_data:
                                 item["Action"] = identifier_to_action.get(item["Identifier"], "No action")
-                            print('bruh8')
+
                         except Exception as e:
                             print("Table not found, attempting fallback to 'Total funding available'")
                             # Attempt to locate the budget in "Total funding available"
@@ -533,31 +550,30 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                 columns_order = ['Identifier', 'Action'] + [col for col in final_df.columns if
                                                             col not in ['Identifier', 'Action']]
                 final_df = final_df[columns_order]
-                # final_df.to_csv(f"{category}.csv", index=False)
-                # print(f"Data saved to {category}.csv")
 
                 for _, row in final_df.iterrows():
-                    raw_deadline = (row.get("Deadline") or "").strip()
-                    if not raw_deadline:
-                        # Provide a default date (or decide to skip this record)
-                        deadline_primary = datetime.today().date()  # or datetime.strptime("1900-01-01", "%Y-%m-%d").date()
+                    raw_deadline = row.get("Deadline")
+
+                    if raw_deadline is None:
+                        # No deadline provided; assign defaults.
+                        deadline_primary = datetime.today().date()
+                        deadline_secondary = None
+                    elif isinstance(raw_deadline, str):
+                        # If it's a string, format it into a date or tuple of dates.
+                        formatted_deadline = format_date(raw_deadline)
+                        if isinstance(formatted_deadline, tuple):
+                            deadline_primary, deadline_secondary = formatted_deadline
+                        else:
+                            deadline_primary = formatted_deadline
+                            deadline_secondary = None
+                    elif isinstance(raw_deadline, date):
+                        # raw_deadline is already a date object
+                        deadline_primary = raw_deadline
                         deadline_secondary = None
                     else:
-                        tokens = raw_deadline.split()
-                        if len(tokens) >= 3:
-                            # Parse the first date
-                            try:
-                                deadline_primary = format_date(raw_deadline.split(" ", 3)[0:3])  # Adjust as needed
-                            except Exception as e:
-                                # handle error, e.g. assign a default date
-                                deadline_primary = datetime.today().date()
-                            # Optionally process secondary if available...
-                        else:
-                            # If the record has an incomplete date string, assign a default or skip
-                            deadline_primary = datetime.today().date()
-                            deadline_secondary = None
-
-                    #print(title)
+                        # Fallback: assign default values if the data type is not recognized.
+                        deadline_primary = datetime.today().date()
+                        deadline_secondary = None
 
                     try:
                         accepted_projects = int(row.get("Accepted Projects", 0))
@@ -567,55 +583,27 @@ async def scrape_eu_portal(closed_option, forthcoming_option, open_option, desir
                     category_name = selected_categories[counter_for_menu]
                     category_id = await get_category_id(category_name)
 
-                    # print(category_name)
-                    # print(category_id)
-
-                    print(formatted_opendate)
-
                     record = {
                         "identifier": row.get("Identifier"),
                         "title": row.get("Title"),
                         "action_type": row.get("Action"),
                         "budget": row.get("Budget"),
                         "funding_per_project": row.get("Funding Per Project"),
-                        "deadline_primary": deadline_primary,  # e.g., "2021-10-06" or "06 OCT 2024"
-                        "deadline_secondary": deadline_secondary,  # e.g., "14 APR 2024" or None
+                        "deadline_primary": deadline_primary,
+                        "deadline_secondary": deadline_secondary,
                         "opening_date": formatted_opendate,
                         "accepted_projects": row.get("Accepted Projects"),
                         "probability_rate": row.get("Probability Rate"),
                         "link": row.get("Link"),
                         "category_id": category_id,
-                        "status": status
+                        "status": status,
+                        "funding_rate": row.get("Funding Rate")
                     }
 
-                    # print (record)
                     try:
                         await store_call(record)
                     except Exception as store_error:
                         print(f"Error during record extraction: {store_error}")
-
-                # # --- JSON Saving Logic ---
-                # results_json_path = "scraped_results.json"
-                #
-                # # Load existing data if file exists
-                # if os.path.exists(results_json_path):
-                #     try:
-                #         with open(results_json_path, "r", encoding="utf-8") as file:
-                #             existing_data = json.load(file)
-                #     except json.JSONDecodeError:
-                #         existing_data = []  # Reset if file is corrupted
-                # else:
-                #     existing_data = []
-                #
-                # # Append new data
-                # new_data = final_df.to_dict(orient="records")  # Convert DataFrame to list of dicts
-                # existing_data.extend(new_data)  # Merge new results
-                #
-                # # Save updated data back to file
-                # with open(results_json_path, "w", encoding="utf-8") as file:
-                #     json.dump(existing_data, file, indent=4)
-                #
-                # print(f"Results saved to {results_json_path}")
 
             counter_for_menu+=1
 
