@@ -50,7 +50,8 @@ async def fetch_calls_by_filters(
                 sc.link,
                 sc.opening_date,
                 c.name AS category_name,
-                sc.status
+                sc.status,
+                sc.funding_rate
             FROM scraped_calls AS sc
             INNER JOIN categories AS c ON sc.category_id = c.id
             WHERE 1=1
@@ -123,9 +124,9 @@ async def store_call(data: dict):
             INSERT INTO scraped_calls (
                 identifier, title, action_type, budget, funding_per_project,
                 deadline_primary, deadline_secondary, opening_date,
-                accepted_projects, probability_rate, link, category_id, status
+                accepted_projects, probability_rate, link, category_id, status, funding_rate
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             ON CONFLICT (identifier) DO UPDATE
             SET 
                 title = EXCLUDED.title,
@@ -139,7 +140,8 @@ async def store_call(data: dict):
                 probability_rate = EXCLUDED.probability_rate,
                 link = EXCLUDED.link,
                 category_id = EXCLUDED.category_id,
-                status = EXCLUDED.status
+                status = EXCLUDED.status,
+                funding_rate = EXCLUDED.funding_rate
         """,
         data.get("identifier"),
         data.get("title"),
@@ -153,7 +155,8 @@ async def store_call(data: dict):
         data.get("probability_rate"),
         data.get("link"),
         data.get("category_id"),
-        data.get("status")
+        data.get("status"),
+        data.get("funding_rate")
         )
 
 
